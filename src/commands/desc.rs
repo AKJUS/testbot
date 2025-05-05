@@ -9,6 +9,8 @@ fn get_conn(pool: &PgPool) -> PooledConnection<ConnectionManager<PgConnection>> 
     pool.get().expect("Failed to get DB connection from pool")
 }
 
+/// Set a key-value pair in the bot's database.
+/// Usage: /set foo bar
 #[poise::command(slash_command, prefix_command)]
 pub async fn set(
     ctx: Context<'_, crate::Data, crate::Error>,
@@ -31,6 +33,8 @@ pub async fn set(
     Ok(())
 }
 
+/// Get the value for a key from the bot's database.
+/// Usage: /get foo
 #[poise::command(slash_command, prefix_command)]
 pub async fn get(
     ctx: Context<'_, crate::Data, crate::Error>,
@@ -52,4 +56,23 @@ pub async fn get(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::models::{Description, NewDescription};
+
+    #[test]
+    fn test_new_description_fields() {
+        let new_desc = NewDescription { key: "foo", value: "bar" };
+        assert_eq!(new_desc.key, "foo");
+        assert_eq!(new_desc.value, "bar");
+    }
+
+    #[test]
+    fn test_description_fields() {
+        let desc = Description { key: "foo".to_string(), value: "bar".to_string() };
+        assert_eq!(desc.key, "foo");
+        assert_eq!(desc.value, "bar");
+    }
 }

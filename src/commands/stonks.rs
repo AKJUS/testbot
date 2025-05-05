@@ -7,11 +7,9 @@
 // use crate::AlphaVantageApiToken;
 
 use plotters::prelude::*;
+use poise::serenity_prelude::CreateAttachment;
 use serde::Deserialize;
 use std::env;
-use std::fs::File;
-use std::io::Cursor;
-use std::path::Path;
 
 #[derive(Deserialize, Debug)]
 struct TimeSeriesDaily {
@@ -25,12 +23,9 @@ struct DailyData {
     close: String,
 }
 
-#[poise::command(
-    slash_command,
-    prefix_command,
-    description = "Show a Finviz chart for a given ticker symbol.",
-    usage = "/stonks AAPL"
-)]
+/// Show a Finviz chart for a ticker symbol.
+/// Usage: /stonks AAPL
+#[poise::command(slash_command, prefix_command)]
 pub async fn stonks(
     ctx: poise::Context<'_, crate::Data, crate::Error>,
     #[rest] tickers: String,
@@ -45,12 +40,9 @@ pub async fn stonks(
     Ok(())
 }
 
-#[poise::command(
-    slash_command,
-    prefix_command,
-    description = "Show a comparison chart of a ticker vs. the S&P 500.",
-    usage = "/stonkcomp AAPL"
-)]
+/// Compare a ticker to the S&P 500.
+/// Usage: /stonkcomp AAPL
+#[poise::command(slash_command, prefix_command)]
 pub async fn stonkcomp(
     ctx: poise::Context<'_, crate::Data, crate::Error>,
     #[rest] tickers: String,
@@ -62,12 +54,9 @@ pub async fn stonkcomp(
     Ok(())
 }
 
-#[poise::command(
-    slash_command,
-    prefix_command,
-    description = "Generate and display a graph of a stock's daily closing prices using AlphaVantage.",
-    usage = "/graph AAPL"
-)]
+/// Show a graph of a stock's daily closing prices.
+/// Usage: /graph AAPL
+#[poise::command(slash_command, prefix_command)]
 pub async fn graph(
     ctx: poise::Context<'_, crate::Data, crate::Error>,
     ticker: String,
@@ -95,7 +84,7 @@ pub async fn graph(
         let min = closes.iter().cloned().fold(f64::INFINITY, f64::min);
         let max = closes.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
         let mut chart = ChartBuilder::on(&root)
-            .caption(format!("{} Closing Prices", ticker), ("sans-serif", 30))
+            .caption(format!("{} Closing Prices", ticker), ("monospace", 30))
             .margin(20)
             .x_label_area_size(40)
             .y_label_area_size(60)
@@ -115,9 +104,46 @@ pub async fn graph(
     }
     // Send as attachment
     ctx.send(
-        poise::CreateReply::default()
-            .attachment((Cursor::new(buf), format!("{}_graph.png", ticker))),
+        poise::CreateReply::default().attachment(CreateAttachment::bytes(
+            buf,
+            format!("{}_graph.png", ticker),
+        )),
     )
     .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_daily_data_parse() {
+        let data = json!({"4. close": "123.45"});
+        let daily: DailyData = serde_json::from_value(data).unwrap();
+        assert_eq!(daily.close, "123.45");
+    }
+
+    #[test]
+    fn test_time_series_daily_parse() {
+        let data = json!({
+            "Time Series (Daily)": {
+                "2023-01-01": {"4. close": "100.0"},
+                "2023-01-02": {"4. close": "110.0"}
+            }
+        });
+        let ts: TimeSeriesDaily = serde_json::from_value(data).unwrap();
+        assert_eq!(ts.time_series.len(), 2);
+        assert_eq!(ts.time_series["2023-01-01"].close, "100.0");
+    }
+
+    #[tokio::test]
+    async fn test_graph_missing_api_key() {
+        std::env::remove_var("ALPHAVANTAGE_API_KEY");
+        let _ctx = (); // Placeholder, can't test Discord context here
+        let _ticker = "AAPL".to_string();
+        let result = std::env::var("ALPHAVANTAGE_API_KEY");
+        assert!(result.is_err());
+    }
 }

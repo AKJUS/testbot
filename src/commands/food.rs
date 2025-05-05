@@ -44,6 +44,8 @@ pub(crate) static RESPONSES: [&str; 41] = [
     "Ramen",
 ];
 
+/// Get a random food suggestion.
+/// Usage: /food
 #[poise::command(slash_command, prefix_command)]
 pub async fn food(ctx: poise::Context<'_, crate::Data, crate::Error>) -> Result<(), crate::Error> {
     let item = random_choice(&RESPONSES).unwrap();

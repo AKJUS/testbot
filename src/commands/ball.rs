@@ -23,12 +23,9 @@ pub(crate) static RESPONSES: [&str; 20] = [
     "You may rely on it.",
 ];
 
-#[poise::command(
-    slash_command,
-    prefix_command,
-    description = "Ask the magic 8-ball a question.",
-    usage = "/ball Will I win the lottery?"
-)]
+/// Ask the magic 8-ball a question.
+/// Usage: /ball Will I win the lottery?
+#[poise::command(slash_command, prefix_command)]
 pub async fn ball(ctx: poise::Context<'_, crate::Data, crate::Error>) -> Result<(), crate::Error> {
     let choice = random_choice(&RESPONSES).unwrap();
     ctx.say(*choice).await?;

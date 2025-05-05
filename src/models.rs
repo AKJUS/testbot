@@ -1,5 +1,6 @@
 use crate::schema::descriptions;
 use diesel::{AsChangeset, Insertable, Queryable};
+use chrono::NaiveDateTime;
 
 #[derive(Queryable, AsChangeset)]
 pub struct Description {
@@ -12,6 +13,25 @@ pub struct Description {
 pub struct NewDescription<'a> {
     pub key: &'a str,
     pub value: &'a str,
+}
+
+#[derive(Queryable, Insertable, Debug)]
+#[diesel(table_name = crate::schema::command_history)]
+pub struct CommandHistory {
+    pub id: i32,
+    pub user: String,
+    pub command: String,
+    pub timestamp: NaiveDateTime,
+}
+
+#[derive(Queryable, Insertable, AsChangeset, Debug)]
+#[diesel(table_name = crate::schema::command_stats)]
+pub struct CommandStat {
+    pub id: i32,
+    pub command: String,
+    pub arguments: String,
+    pub count: i32,
+    pub last_used: chrono::NaiveDateTime,
 }
 
 #[cfg(test)]

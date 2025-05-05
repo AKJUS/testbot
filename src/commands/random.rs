@@ -1,5 +1,7 @@
 use rand::prelude::IteratorRandom;
 
+/// Choose a random item from a list of choices.
+/// Usage: /random apple orange banana
 #[poise::command(slash_command, prefix_command)]
 pub async fn random(
     ctx: poise::Context<'_, crate::Data, crate::Error>,
@@ -16,7 +18,7 @@ pub async fn random(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // use super::*;
     use crate::utils::random_choice;
 
     #[test]

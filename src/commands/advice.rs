@@ -11,6 +11,8 @@ struct Advice {
     slip: Slip,
 }
 
+/// Get a random piece of advice.
+/// Usage: /advice
 #[poise::command(slash_command, prefix_command)]
 pub async fn advice(
     ctx: poise::Context<'_, crate::Data, crate::Error>,
