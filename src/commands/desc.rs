@@ -1,7 +1,7 @@
-use poise::Context;
 use crate::models::{Description, NewDescription};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
+use poise::Context;
 
 type PgPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;
 
@@ -17,7 +17,10 @@ pub async fn set(
 ) -> Result<(), crate::Error> {
     let pool = &ctx.data().db_pool;
     let mut conn = get_conn(pool);
-    let new_desc = NewDescription { key: &key, value: &value };
+    let new_desc = NewDescription {
+        key: &key,
+        value: &value,
+    };
     diesel::insert_into(crate::schema::descriptions::table)
         .values(&new_desc)
         .on_conflict(crate::schema::descriptions::key)
@@ -40,8 +43,13 @@ pub async fn get(
         .first::<Description>(&mut conn)
         .optional()?;
     match result {
-        Some(desc) => { ctx.say(format!("{} = {}", desc.key, desc.value)).await?; },
-        None => { ctx.say(format!("No value found for key '{}'.", key)).await?; },
+        Some(desc) => {
+            ctx.say(format!("{} = {}", desc.key, desc.value)).await?;
+        }
+        None => {
+            ctx.say(format!("No value found for key '{}'.", key))
+                .await?;
+        }
     }
     Ok(())
 }

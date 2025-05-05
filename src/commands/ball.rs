@@ -24,7 +24,8 @@ pub(crate) static RESPONSES: [&str; 20] = [
 ];
 
 #[poise::command(
-    slash_command, prefix_command,
+    slash_command,
+    prefix_command,
     description = "Ask the magic 8-ball a question.",
     usage = "/ball Will I win the lottery?"
 )]
@@ -45,6 +46,8 @@ mod tests {
 
     #[test]
     fn test_responses_contains_yes() {
-        assert!(RESPONSES.iter().any(|&s| s.contains("yes") || s.contains("Yes")));
+        assert!(RESPONSES
+            .iter()
+            .any(|&s| s.contains("yes") || s.contains("Yes")));
     }
 }

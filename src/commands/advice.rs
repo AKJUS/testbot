@@ -12,7 +12,9 @@ struct Advice {
 }
 
 #[poise::command(slash_command, prefix_command)]
-pub async fn advice(ctx: poise::Context<'_, crate::Data, crate::Error>) -> Result<(), crate::Error> {
+pub async fn advice(
+    ctx: poise::Context<'_, crate::Data, crate::Error>,
+) -> Result<(), crate::Error> {
     const ENDPOINT: &str = "https://api.adviceslip.com/advice";
     let advice = reqwest::get(ENDPOINT).await?.json::<Advice>().await?;
     let results = format!("{} - #{}", advice.slip.advice, advice.slip.id);

@@ -35,6 +35,8 @@ mod tests {
 
     #[test]
     fn test_responses_contains_water() {
-        assert!(RESPONSES.iter().any(|&s| s.to_lowercase().contains("water")));
+        assert!(RESPONSES
+            .iter()
+            .any(|&s| s.to_lowercase().contains("water")));
     }
 }

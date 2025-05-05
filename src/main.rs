@@ -10,24 +10,27 @@ mod utils;
 // extern crate diesel;
 // use diesel::pg::Pg;
 // use diesel::r2d2::ManageConnection;
-use dotenvy::dotenv;
-use poise::{self, serenity_prelude::{ClientBuilder, GatewayIntents}};
-use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::pg::PgConnection;
+use diesel::r2d2::{ConnectionManager, Pool};
+use dotenvy::dotenv;
+use poise::{
+    self,
+    serenity_prelude::{ClientBuilder, GatewayIntents},
+};
 // use std::error::Error;
 
 use commands::{
     advice::advice,
     ball::ball,
     botsnack::botsnack,
-    desc::{set, get},
+    desc::{get, set},
     drink::drink,
     food::food,
     github::github,
     owner::quit,
-    pingpong::{ping, fart},
+    pingpong::{fart, ping},
     random::random,
-    stonks::{stonks, stonkcomp, graph},
+    stonks::{graph, stonkcomp, stonks},
 };
 
 // use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
@@ -47,7 +50,9 @@ async fn main() -> Result<(), Error> {
     let token = std::env::var("DISCORD_TOKEN")?;
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let manager = ConnectionManager::<PgConnection>::new(database_url);
-    let db_pool = Pool::builder().build(manager).expect("Failed to create pool.");
+    let db_pool = Pool::builder()
+        .build(manager)
+        .expect("Failed to create pool.");
     let options = poise::FrameworkOptions {
         commands: vec![
             advice(),
@@ -75,9 +80,12 @@ async fn main() -> Result<(), Error> {
             Box::pin(async move { Ok(Data { db_pool }) })
         })
         .build();
-    let mut client = ClientBuilder::new(token, GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT)
-        .framework(framework)
-        .await?;
+    let mut client = ClientBuilder::new(
+        token,
+        GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT,
+    )
+    .framework(framework)
+    .await?;
     client.start().await?;
     Ok(())
 }

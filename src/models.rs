@@ -1,5 +1,5 @@
-use diesel::{Queryable, Insertable, AsChangeset};
 use crate::schema::descriptions;
+use diesel::{AsChangeset, Insertable, Queryable};
 
 #[derive(Queryable, AsChangeset)]
 pub struct Description {
@@ -20,14 +20,20 @@ mod tests {
 
     #[test]
     fn test_description_struct() {
-        let desc = Description { key: "foo".to_string(), value: "bar".to_string() };
+        let desc = Description {
+            key: "foo".to_string(),
+            value: "bar".to_string(),
+        };
         assert_eq!(desc.key, "foo");
         assert_eq!(desc.value, "bar");
     }
 
     #[test]
     fn test_new_description_struct() {
-        let new_desc = NewDescription { key: "foo", value: "bar" };
+        let new_desc = NewDescription {
+            key: "foo",
+            value: "bar",
+        };
         assert_eq!(new_desc.key, "foo");
         assert_eq!(new_desc.value, "bar");
     }

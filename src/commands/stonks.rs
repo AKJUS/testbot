@@ -10,8 +10,8 @@ use plotters::prelude::*;
 use serde::Deserialize;
 use std::env;
 use std::fs::File;
-use std::path::Path;
 use std::io::Cursor;
+use std::path::Path;
 
 #[derive(Deserialize, Debug)]
 struct TimeSeriesDaily {
@@ -26,7 +26,8 @@ struct DailyData {
 }
 
 #[poise::command(
-    slash_command, prefix_command,
+    slash_command,
+    prefix_command,
     description = "Show a Finviz chart for a given ticker symbol.",
     usage = "/stonks AAPL"
 )]
@@ -45,7 +46,8 @@ pub async fn stonks(
 }
 
 #[poise::command(
-    slash_command, prefix_command,
+    slash_command,
+    prefix_command,
     description = "Show a comparison chart of a ticker vs. the S&P 500.",
     usage = "/stonkcomp AAPL"
 )]
@@ -54,17 +56,15 @@ pub async fn stonkcomp(
     #[rest] tickers: String,
 ) -> Result<(), crate::Error> {
     for stonk in tickers.split_whitespace() {
-        ctx.say(format!(
-            "https://stonks.egd.pw/spcomp?symbol={}",
-            stonk
-        ))
-        .await?;
+        ctx.say(format!("https://stonks.egd.pw/spcomp?symbol={}", stonk))
+            .await?;
     }
     Ok(())
 }
 
 #[poise::command(
-    slash_command, prefix_command,
+    slash_command,
+    prefix_command,
     description = "Generate and display a graph of a stock's daily closing prices using AlphaVantage.",
     usage = "/graph AAPL"
 )]
@@ -100,7 +100,8 @@ pub async fn graph(
             .x_label_area_size(40)
             .y_label_area_size(60)
             .build_cartesian_2d(0..closes.len(), min..max)?;
-        chart.configure_mesh()
+        chart
+            .configure_mesh()
             .x_labels(10)
             .x_label_formatter(&|idx| date_labels[*idx].to_string())
             .y_desc("Close")
@@ -116,8 +117,7 @@ pub async fn graph(
     ctx.send(
         poise::CreateReply::default()
             .attachment((Cursor::new(buf), format!("{}_graph.png", ticker))),
-    ).await?;
+    )
+    .await?;
     Ok(())
 }
-
-
