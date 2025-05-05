@@ -1,89 +1,47 @@
-use crate::diesel::prelude::*;
-use crate::diesel::QueryDsl;
-use crate::diesel::RunQueryDsl;
-// use crate::models::*;
-use crate::schema::descriptions::dsl::*;
-use crate::PostgresClient;
-use diesel::r2d2::ManageConnection;
-use serenity::framework::standard::{macros::command, Args, CommandResult};
-use serenity::model::prelude::*;
-use serenity::prelude::*;
+use poise::Context;
+use crate::models::{Description, NewDescription};
+use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, PooledConnection};
 
-#[command]
-#[aliases("set")]
-async fn describe(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    let data = ctx.data.read().await;
-    let input_key = args.single::<String>().unwrap();
-    let input_value = args.remains().unwrap();
+type PgPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;
 
-    if let Some(dbclient) = data.get::<PostgresClient>() {
-        let mut connection = dbclient.connect().expect("Could not connect to Postgres");
-        let _ = msg
-            .channel_id
-            .say(
-                &ctx.http,
-                &format!("Defining {} as: '{}'", &input_key, &input_value),
-            )
-            .await;
+fn get_conn(pool: &PgPool) -> PooledConnection<ConnectionManager<PgConnection>> {
+    pool.get().expect("Failed to get DB connection from pool")
+}
 
-        let description = NewDescription {
-            key: &input_key,
-            value: input_value,
-        };
-        diesel::insert_into(descriptions)
-            .values(&description)
-            .on_conflict(key)
-            .do_update()
-            .set(&description)
-            .execute(&mut connection)?;
-    } else {
-        msg.reply(
-            ctx,
-            &format!(
-                "There was a problem reading from the database. Failed to define {} as '{}'",
-                &input_key, &input_value
-            ),
-        )
-        .await?;
-
-        return Ok(());
-    };
+#[poise::command(slash_command, prefix_command)]
+pub async fn set(
+    ctx: Context<'_, crate::Data, crate::Error>,
+    key: String,
+    value: String,
+) -> Result<(), crate::Error> {
+    let pool = &ctx.data().db_pool;
+    let mut conn = get_conn(pool);
+    let new_desc = NewDescription { key: &key, value: &value };
+    diesel::insert_into(crate::schema::descriptions::table)
+        .values(&new_desc)
+        .on_conflict(crate::schema::descriptions::key)
+        .do_update()
+        .set(&new_desc)
+        .execute(&mut conn)?;
+    ctx.say(format!("Set {} = {}", key, value)).await?;
     Ok(())
 }
 
-#[command]
-#[aliases("show", "get")]
-async fn define(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    let data = ctx.data.read().await;
-    let input_key = args.single::<String>().unwrap();
-
-    if let Some(dbclient) = data.get::<PostgresClient>() {
-        let mut connection = dbclient.connect().expect("Could not connect to Postgres");
-
-        // Do DB Read here
-        let value_data = descriptions
-            .filter(key.eq(&input_key))
-            .load::<Description>(&mut connection)
-            .expect("Error loading results.");
-
-        let _ = msg
-            .channel_id
-            .say(
-                &ctx.http,
-                &format!("{} is described as: '{}'", input_key, &value_data[0].value),
-            )
-            .await;
-    } else {
-        msg.reply(
-            ctx,
-            &format!(
-                "There was a problem looking up the value for {}",
-                &input_key
-            ),
-        )
-        .await?;
-
-        return Ok(());
+#[poise::command(slash_command, prefix_command)]
+pub async fn get(
+    ctx: Context<'_, crate::Data, crate::Error>,
+    key: String,
+) -> Result<(), crate::Error> {
+    let pool = &ctx.data().db_pool;
+    let mut conn = get_conn(pool);
+    let result = crate::schema::descriptions::table
+        .filter(crate::schema::descriptions::key.eq(&key))
+        .first::<Description>(&mut conn)
+        .optional()?;
+    match result {
+        Some(desc) => { ctx.say(format!("{} = {}", desc.key, desc.value)).await?; },
+        None => { ctx.say(format!("No value found for key '{}'.", key)).await?; },
     }
     Ok(())
 }

@@ -1,16 +1,29 @@
-use rand::seq::IteratorRandom;
-use serenity::framework::standard::{macros::command, CommandResult};
-use serenity::model::prelude::*;
-use serenity::prelude::*;
+use crate::utils::random_choice;
 
-#[command]
-#[description = "A bot's gotta eat...."]
-#[usage = ""]
-async fn botsnack(ctx: &Context, msg: &Message) -> CommandResult {
-    let responses = ["Yum!", "*cronch*", "MOAR", "*Smiles*", "Nice."];
-    let response = responses.iter().choose(&mut rand::rng()).unwrap();
+pub(crate) static RESPONSES: [&str; 5] = ["Yum!", "*cronch*", "MOAR", "*Smiles*", "Nice."];
 
-    let _ = msg.channel_id.say(&ctx.http, response).await;
-
+#[poise::command(
+    slash_command, prefix_command,
+    description = "Give the bot a snack!",
+    usage = "/botsnack"
+)]
+pub async fn botsnack(ctx: poise::Context<'_, crate::Data, crate::Error>) -> Result<(), crate::Error> {
+    let response = random_choice(&RESPONSES).unwrap();
+    ctx.say(*response).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_responses_not_empty() {
+        assert!(!RESPONSES.is_empty());
+    }
+
+    #[test]
+    fn test_responses_contains_yum() {
+        assert!(RESPONSES.iter().any(|&s| s.contains("Yum")));
+    }
 }

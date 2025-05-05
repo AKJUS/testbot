@@ -1,7 +1,4 @@
 use serde::Deserialize;
-use serenity::framework::standard::{macros::command, CommandResult};
-use serenity::model::prelude::*;
-use serenity::prelude::*;
 
 #[derive(Deserialize)]
 struct Slip {
@@ -14,14 +11,30 @@ struct Advice {
     slip: Slip,
 }
 
-#[command]
-#[description = "Asks for the advice of the gods and reveals their musings."]
-#[usage = ""]
-async fn advice(ctx: &Context, msg: &Message) -> CommandResult {
+#[poise::command(slash_command, prefix_command)]
+pub async fn advice(ctx: poise::Context<'_, crate::Data, crate::Error>) -> Result<(), crate::Error> {
     const ENDPOINT: &str = "https://api.adviceslip.com/advice";
     let advice = reqwest::get(ENDPOINT).await?.json::<Advice>().await?;
     let results = format!("{} - #{}", advice.slip.advice, advice.slip.id);
-
-    let _ = msg.channel_id.say(&ctx.http, results).await;
+    ctx.say(results).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_advice_deserialize() {
+        let data = json!({
+            "slip": {
+                "id": 123,
+                "advice": "Test advice."
+            }
+        });
+        let advice: Advice = serde_json::from_value(data).unwrap();
+        assert_eq!(advice.slip.id, 123);
+        assert_eq!(advice.slip.advice, "Test advice.");
+    }
 }

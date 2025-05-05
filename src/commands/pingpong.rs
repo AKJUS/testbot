@@ -1,24 +1,11 @@
-use serenity::framework::standard::{macros::command, CommandResult};
-use serenity::model::prelude::*;
-use serenity::prelude::*;
-
-#[command]
-#[description = "Reploy with 'Pong!'"]
-#[usage = ""]
-async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
-    let _ = msg.channel_id.say(&ctx.http, "Pong!").await;
-
+#[poise::command(slash_command, prefix_command)]
+pub async fn ping(ctx: poise::Context<'_, crate::Data, crate::Error>) -> Result<(), crate::Error> {
+    ctx.say("Pong!").await?;
     Ok(())
 }
 
-#[command]
-#[description = "Let er' rip!"]
-#[usage = ""]
-async fn fart(ctx: &Context, msg: &Message) -> CommandResult {
-    let _ = msg
-        .channel_id
-        .say(&ctx.http, "Thbbbbbbbbbbbbbbt.... squeak.")
-        .await;
-
+#[poise::command(slash_command, prefix_command)]
+pub async fn fart(ctx: poise::Context<'_, crate::Data, crate::Error>) -> Result<(), crate::Error> {
+    ctx.say("Thbbbbbbbbbbbbbbt.... squeak.").await?;
     Ok(())
 }

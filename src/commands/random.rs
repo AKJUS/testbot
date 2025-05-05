@@ -1,21 +1,37 @@
 use rand::prelude::IteratorRandom;
-use serenity::framework::standard::{macros::command, Args, CommandResult};
-use serenity::model::prelude::*;
-use serenity::prelude::*;
 
-#[command]
-#[aliases("rand")]
-#[description = "Choose a random item from the list of inputs"]
-#[usage = "foo bar baz"]
-async fn random(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-    let choices = args.raw().collect::<Vec<&str>>();
-
-    let thing = choices.iter().choose(&mut rand::rng());
-
+#[poise::command(slash_command, prefix_command)]
+pub async fn random(
+    ctx: poise::Context<'_, crate::Data, crate::Error>,
+    #[rest] choices: String,
+) -> Result<(), crate::Error> {
+    let choices_vec: Vec<&str> = choices.split_whitespace().collect();
+    let thing = choices_vec.iter().choose(&mut rand::rng());
     match thing {
-        Some(choice) => msg.channel_id.say(&ctx.http, choice).await?,
-        _ => msg.channel_id.say(&ctx.http, "Why u no args?!").await?,
+        Some(choice) => ctx.say(*choice).await?,
+        None => ctx.say("Why u no args?!").await?,
     };
-
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::utils::random_choice;
+
+    #[test]
+    fn test_choices_split() {
+        let input = "foo bar baz";
+        let choices_vec: Vec<&str> = input.split_whitespace().collect();
+        assert_eq!(choices_vec, vec!["foo", "bar", "baz"]);
+    }
+
+    #[test]
+    fn test_random_choice_from_choices() {
+        let input = "foo bar baz";
+        let choices_vec: Vec<&str> = input.split_whitespace().collect();
+        let result = random_choice(&choices_vec);
+        assert!(result.is_some());
+        assert!(choices_vec.contains(result.unwrap()));
+    }
 }
