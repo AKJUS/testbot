@@ -1,16 +1,16 @@
 use crate::Data;
-use sysinfo::{System, SystemExt, Process, ProcessExt};
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::PgConnection;
+use mockall::mock;
+use mockall::predicate::*;
+use poise::serenity_prelude::{ChannelId, Guild, GuildChannel, GuildId, User, UserId};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
-use diesel::r2d2::{Pool, ConnectionManager};
-use diesel::PgConnection;
-use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use poise::serenity_prelude::{GuildId, Guild, UserId, User, ChannelId, GuildChannel};
-use mockall::predicate::*;
-use mockall::mock;
 use std::time::Duration;
+use sysinfo::{Process, ProcessExt, System, SystemExt};
+use tokio::sync::RwLock;
 
 /// Error type for system operations
 #[derive(Debug)]
@@ -95,10 +95,10 @@ pub fn display_error(error: Box<dyn Error>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mockall::predicate::*;
-    use mockall::mock;
     use diesel::r2d2::ConnectionManager;
     use diesel::PgConnection;
+    use mockall::mock;
+    use mockall::predicate::*;
 
     mock! {
         PgConnection {}
@@ -197,4 +197,4 @@ mod tests {
         let display = display_error(error);
         assert_eq!(display, "System error: Test error");
     }
-} 
+}

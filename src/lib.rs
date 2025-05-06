@@ -1,39 +1,37 @@
 pub mod commands;
 pub mod db;
+pub mod interactions;
 pub mod metrics;
 pub mod schema;
 pub mod utils;
-pub mod interactions;
 
 pub use crate::db::Pool;
 pub use crate::metrics::{
-    command::{COUNTER as COMMAND_COUNTER, FAILURES as COMMAND_FAILURES, DURATION as COMMAND_DURATION},
-    http::{REQUESTS as HTTP_REQUESTS, DURATION as HTTP_DURATION},
-    process::{START_TIME as PROCESS_START_TIME, DB_POOL_CONNECTIONS, MEMORY_USAGE, CPU_USAGE},
-    discord::{GUILD_COUNT, USER_COUNT, CHANNEL_COUNT},
+    command::{
+        COUNTER as COMMAND_COUNTER, DURATION as COMMAND_DURATION, FAILURES as COMMAND_FAILURES,
+    },
+    discord::{CHANNEL_COUNT, GUILD_COUNT, USER_COUNT},
     guild::{
-        MEMBER_COUNT, CHANNEL_COUNT as GUILD_CHANNEL_COUNT, ROLE_COUNT, ONLINE_COUNT,
-        CREATION_TIME, HUMAN_COUNT, BOT_COUNT, TEXT_CHANNEL_COUNT, VOICE_CHANNEL_COUNT,
-        CATEGORY_CHANNEL_COUNT, EMOJI_COUNT, STICKER_COUNT, BOOST_COUNT,
-        PREMIUM_TIER, OWNER_ID, AFK_TIMEOUT
+        AFK_TIMEOUT, BOOST_COUNT, BOT_COUNT, CATEGORY_CHANNEL_COUNT,
+        CHANNEL_COUNT as GUILD_CHANNEL_COUNT, CREATION_TIME, EMOJI_COUNT, HUMAN_COUNT,
+        MEMBER_COUNT, ONLINE_COUNT, OWNER_ID, PREMIUM_TIER, ROLE_COUNT, STICKER_COUNT,
+        TEXT_CHANNEL_COUNT, VOICE_CHANNEL_COUNT,
     },
+    http::{DURATION as HTTP_DURATION, REQUESTS as HTTP_REQUESTS},
     interaction::{
-        SLASH_COMMAND_USAGE,
-        BUTTON_CLICKS,
-        SELECT_MENU_USAGE,
-        MODAL_SUBMISSIONS,
-        CONTEXT_MENU_USAGE,
-        AUTOCOMPLETE_REQUESTS,
+        AUTOCOMPLETE_REQUESTS, BUTTON_CLICKS, CONTEXT_MENU_USAGE, MODAL_SUBMISSIONS,
+        SELECT_MENU_USAGE, SLASH_COMMAND_USAGE,
     },
+    process::{CPU_USAGE, DB_POOL_CONNECTIONS, MEMORY_USAGE, START_TIME as PROCESS_START_TIME},
 };
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 
+use crate::interactions::InteractionTracker;
+use serenity::model::id::{ChannelId, GuildId, UserId};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use std::collections::HashMap;
-use serenity::model::id::{GuildId, UserId, ChannelId};
-use crate::interactions::InteractionTracker;
 
 pub struct Data {
     pub db_pool: Arc<db::Pool>,
@@ -55,4 +53,4 @@ impl Data {
             interaction_tracker: Arc::new(InteractionTracker::new(db_pool)),
         }
     }
-} 
+}

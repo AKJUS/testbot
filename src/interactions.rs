@@ -1,17 +1,20 @@
-use crate::models::{InteractionLog, NewInteractionLog, InteractionStats, NewInteractionStats, UpdateInteractionStats, RateLimit, NewRateLimit, UpdateRateLimit};
+use crate::models::{
+    InteractionLog, InteractionStats, NewInteractionLog, NewInteractionStats, NewRateLimit,
+    RateLimit, UpdateInteractionStats, UpdateRateLimit,
+};
 use crate::schema::{interaction_logs, interaction_stats, rate_limits};
+use chrono::{DateTime, Duration, Utc};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
-use chrono::{DateTime, Duration, Utc};
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use std::collections::HashMap;
 use serenity::model::id::{GuildId, UserId};
 use serenity::model::interactions::application_command::ApplicationCommandInteraction;
+use serenity::model::interactions::autocomplete::AutocompleteInteraction;
 use serenity::model::interactions::message_component::MessageComponentInteraction;
 use serenity::model::interactions::modal::ModalSubmitInteraction;
-use serenity::model::interactions::autocomplete::AutocompleteInteraction;
 use serenity::model::interactions::InteractionType;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 pub struct InteractionTracker {
     db_pool: Pool<ConnectionManager<PgConnection>>,
@@ -26,7 +29,10 @@ impl InteractionTracker {
         }
     }
 
-    pub async fn track_slash_command(&self, interaction: &ApplicationCommandInteraction) -> Result<(), diesel::result::Error> {
+    pub async fn track_slash_command(
+        &self,
+        interaction: &ApplicationCommandInteraction,
+    ) -> Result<(), diesel::result::Error> {
         let start_time = Utc::now();
         let guild_id = interaction.guild_id.map(|id| id.0 as i64).unwrap_or(0);
         let user_id = interaction.user.id.0 as i64;
@@ -55,12 +61,16 @@ impl InteractionTracker {
             .execute(&conn)?;
 
         // Update stats
-        self.update_interaction_stats("slash_command", &interaction_id, guild_id, 0.0, true).await?;
+        self.update_interaction_stats("slash_command", &interaction_id, guild_id, 0.0, true)
+            .await?;
 
         Ok(())
     }
 
-    pub async fn track_button_click(&self, interaction: &MessageComponentInteraction) -> Result<(), diesel::result::Error> {
+    pub async fn track_button_click(
+        &self,
+        interaction: &MessageComponentInteraction,
+    ) -> Result<(), diesel::result::Error> {
         let start_time = Utc::now();
         let guild_id = interaction.guild_id.map(|id| id.0 as i64).unwrap_or(0);
         let user_id = interaction.user.id.0 as i64;
@@ -89,12 +99,16 @@ impl InteractionTracker {
             .execute(&conn)?;
 
         // Update stats
-        self.update_interaction_stats("button", &interaction_id, guild_id, 0.0, true).await?;
+        self.update_interaction_stats("button", &interaction_id, guild_id, 0.0, true)
+            .await?;
 
         Ok(())
     }
 
-    pub async fn track_modal_submit(&self, interaction: &ModalSubmitInteraction) -> Result<(), diesel::result::Error> {
+    pub async fn track_modal_submit(
+        &self,
+        interaction: &ModalSubmitInteraction,
+    ) -> Result<(), diesel::result::Error> {
         let start_time = Utc::now();
         let guild_id = interaction.guild_id.map(|id| id.0 as i64).unwrap_or(0);
         let user_id = interaction.user.id.0 as i64;
@@ -123,12 +137,16 @@ impl InteractionTracker {
             .execute(&conn)?;
 
         // Update stats
-        self.update_interaction_stats("modal", &interaction_id, guild_id, 0.0, true).await?;
+        self.update_interaction_stats("modal", &interaction_id, guild_id, 0.0, true)
+            .await?;
 
         Ok(())
     }
 
-    pub async fn track_autocomplete(&self, interaction: &AutocompleteInteraction) -> Result<(), diesel::result::Error> {
+    pub async fn track_autocomplete(
+        &self,
+        interaction: &AutocompleteInteraction,
+    ) -> Result<(), diesel::result::Error> {
         let start_time = Utc::now();
         let guild_id = interaction.guild_id.map(|id| id.0 as i64).unwrap_or(0);
         let user_id = interaction.user.id.0 as i64;
@@ -157,7 +175,8 @@ impl InteractionTracker {
             .execute(&conn)?;
 
         // Update stats
-        self.update_interaction_stats("autocomplete", &interaction_id, guild_id, 0.0, true).await?;
+        self.update_interaction_stats("autocomplete", &interaction_id, guild_id, 0.0, true)
+            .await?;
 
         Ok(())
     }
@@ -165,16 +184,14 @@ impl InteractionTracker {
     async fn check_rate_limit(&self, interaction_type: &str, guild_id: i64) -> bool {
         let mut rate_limits = self.rate_limits.write().await;
         let key = (interaction_type.to_string(), guild_id);
-        
+
         let now = Utc::now();
-        let limit = rate_limits.entry(key.clone()).or_insert_with(|| {
-            RateLimit {
-                id: 0,
-                interaction_type: interaction_type.to_string(),
-                guild_id,
-                hits: 0,
-                reset_at: (now + Duration::minutes(1)).naive_utc(),
-            }
+        let limit = rate_limits.entry(key.clone()).or_insert_with(|| RateLimit {
+            id: 0,
+            interaction_type: interaction_type.to_string(),
+            guild_id,
+            hits: 0,
+            reset_at: (now + Duration::minutes(1)).naive_utc(),
         });
 
         if now.naive_utc() > limit.reset_at {
@@ -206,12 +223,13 @@ impl InteractionTracker {
             interaction_stats::table
                 .filter(interaction_stats::interaction_type.eq(interaction_type))
                 .filter(interaction_stats::interaction_id.eq(interaction_id))
-                .filter(interaction_stats::guild_id.eq(guild_id))
+                .filter(interaction_stats::guild_id.eq(guild_id)),
         )
         .set((
             interaction_stats::count.eq(interaction_stats::count + 1),
             interaction_stats::total_duration.eq(interaction_stats::total_duration + duration),
-            interaction_stats::failure_count.eq(interaction_stats::failure_count + if !success { 1 } else { 0 }),
+            interaction_stats::failure_count
+                .eq(interaction_stats::failure_count + if !success { 1 } else { 0 }),
             interaction_stats::last_used.eq(now),
         ))
         .execute(&conn);
@@ -242,7 +260,7 @@ impl InteractionTracker {
         guild_id: i64,
     ) -> Result<Vec<InteractionStats>, diesel::result::Error> {
         let conn = self.db_pool.get().unwrap();
-        
+
         interaction_stats::table
             .filter(interaction_stats::interaction_type.eq(interaction_type))
             .filter(interaction_stats::guild_id.eq(guild_id))
@@ -256,7 +274,7 @@ impl InteractionTracker {
         limit: i64,
     ) -> Result<Vec<InteractionLog>, diesel::result::Error> {
         let conn = self.db_pool.get().unwrap();
-        
+
         interaction_logs::table
             .filter(interaction_logs::interaction_type.eq(interaction_type))
             .filter(interaction_logs::guild_id.eq(guild_id))
@@ -269,17 +287,17 @@ impl InteractionTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serenity::model::id::{GuildId, UserId};
-    use serenity::model::interactions::application_command::ApplicationCommandInteraction;
-    use serenity::model::interactions::message_component::MessageComponentInteraction;
-    use serenity::model::interactions::modal::ModalSubmitInteraction;
-    use serenity::model::interactions::autocomplete::AutocompleteInteraction;
-    use serenity::model::interactions::InteractionType;
-    use serenity::model::user::User;
     use serenity::model::application::interaction::application_command::ApplicationCommandData;
+    use serenity::model::application::interaction::autocomplete::AutocompleteData;
     use serenity::model::application::interaction::message_component::MessageComponentData;
     use serenity::model::application::interaction::modal::ModalSubmitData;
-    use serenity::model::application::interaction::autocomplete::AutocompleteData;
+    use serenity::model::id::{GuildId, UserId};
+    use serenity::model::interactions::application_command::ApplicationCommandInteraction;
+    use serenity::model::interactions::autocomplete::AutocompleteInteraction;
+    use serenity::model::interactions::message_component::MessageComponentInteraction;
+    use serenity::model::interactions::modal::ModalSubmitInteraction;
+    use serenity::model::interactions::InteractionType;
+    use serenity::model::user::User;
 
     #[tokio::test]
     async fn test_rate_limiting() {
@@ -337,7 +355,10 @@ mod tests {
             version: 1,
         };
 
-        assert!(tracker.track_slash_command(&command_interaction).await.is_ok());
+        assert!(tracker
+            .track_slash_command(&command_interaction)
+            .await
+            .is_ok());
 
         // Test button click tracking
         let button_data = MessageComponentData {
@@ -358,7 +379,10 @@ mod tests {
             version: 1,
         };
 
-        assert!(tracker.track_button_click(&button_interaction).await.is_ok());
+        assert!(tracker
+            .track_button_click(&button_interaction)
+            .await
+            .is_ok());
 
         // Test modal submit tracking
         let modal_data = ModalSubmitData {
@@ -399,6 +423,9 @@ mod tests {
             version: 1,
         };
 
-        assert!(tracker.track_autocomplete(&autocomplete_interaction).await.is_ok());
+        assert!(tracker
+            .track_autocomplete(&autocomplete_interaction)
+            .await
+            .is_ok());
     }
-} 
+}

@@ -1,7 +1,7 @@
-use poise::Context;
 use crate::models::CommandStat;
 use diesel::prelude::*;
 use diesel::ExpressionMethods;
+use poise::Context;
 
 /// Show command usage statistics.
 /// Usage: /stats
@@ -25,4 +25,4 @@ pub async fn stats(ctx: Context<'_, crate::Data, crate::Error>) -> Result<(), cr
     }
     ctx.say(msg).await?;
     Ok(())
-} 
+}

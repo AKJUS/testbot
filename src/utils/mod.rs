@@ -4,9 +4,9 @@ pub mod metrics;
 pub mod system;
 pub mod time;
 
-use std::time::Duration;
-use poise::serenity_prelude::{Guild, GuildId, UserId};
 use crate::Data;
+use poise::serenity_prelude::{Guild, GuildId, UserId};
+use std::time::Duration;
 
 /// Convert a Duration to a human-readable string
 pub fn format_duration(duration: Duration) -> String {
@@ -29,7 +29,10 @@ pub fn get_owner(guild: &Guild) -> UserId {
 
 /// Get the AFK timeout of a guild in seconds
 pub fn get_afk_timeout(guild: &Guild) -> i64 {
-    guild.afk_metadata.as_ref().map_or(0, |m| i64::from(u16::from(m.afk_timeout)))
+    guild
+        .afk_metadata
+        .as_ref()
+        .map_or(0, |m| i64::from(u16::from(m.afk_timeout)))
 }
 
 /// Get the creation time of a guild
@@ -42,7 +45,9 @@ pub fn count_members<F>(guild: &Guild, predicate: F) -> i64
 where
     F: Fn(&poise::serenity_prelude::Member) -> bool,
 {
-    guild.members.values()
+    guild
+        .members
+        .values()
         .filter(|member| predicate(member))
         .count() as i64
 }
@@ -54,17 +59,23 @@ pub fn count_bots(guild: &Guild) -> i64 {
 
 /// Get the number of text channels in a guild
 pub fn count_text_channels(guild: &Guild) -> i64 {
-    count_channels(guild, |channel| matches!(channel.kind, poise::serenity_prelude::ChannelType::Text))
+    count_channels(guild, |channel| {
+        matches!(channel.kind, poise::serenity_prelude::ChannelType::Text)
+    })
 }
 
 /// Get the number of voice channels in a guild
 pub fn count_voice_channels(guild: &Guild) -> i64 {
-    count_channels(guild, |channel| matches!(channel.kind, poise::serenity_prelude::ChannelType::Voice))
+    count_channels(guild, |channel| {
+        matches!(channel.kind, poise::serenity_prelude::ChannelType::Voice)
+    })
 }
 
 /// Get the number of category channels in a guild
 pub fn count_categories(guild: &Guild) -> i64 {
-    count_channels(guild, |channel| matches!(channel.kind, poise::serenity_prelude::ChannelType::Category))
+    count_channels(guild, |channel| {
+        matches!(channel.kind, poise::serenity_prelude::ChannelType::Category)
+    })
 }
 
 /// Get the number of emojis in a guild
@@ -162,7 +173,9 @@ pub use time::*;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use poise::serenity_prelude::{Guild, GuildId, UserId, Member, User, GuildChannel, ChannelType};
+    use poise::serenity_prelude::{
+        ChannelType, Guild, GuildChannel, GuildId, Member, User, UserId,
+    };
     use std::collections::HashMap;
 
     fn create_test_guild() -> Guild {
@@ -249,4 +262,4 @@ mod tests {
         assert_eq!(count_categories(&guild), 0);
         assert_eq!(get_premium_tier(&guild), 0);
     }
-} 
+}

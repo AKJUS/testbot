@@ -1,9 +1,11 @@
 use crate::schema::descriptions;
-use diesel::{AsChangeset, Insertable, Queryable};
+use crate::schema::{
+    command_logs, command_stats, interaction_logs, interaction_stats, rate_limits,
+};
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
-use crate::schema::{command_logs, command_stats, interaction_logs, interaction_stats, rate_limits};
-use serde::{Serialize, Deserialize};
+use diesel::{AsChangeset, Insertable, Queryable};
+use serde::{Deserialize, Serialize};
 
 #[derive(Queryable, AsChangeset)]
 pub struct Description {

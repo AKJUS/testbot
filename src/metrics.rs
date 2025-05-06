@@ -1,5 +1,8 @@
-use prometheus::{IntCounterVec, IntGauge, HistogramVec, register_int_counter_vec, register_histogram_vec, register_int_gauge};
 use lazy_static::lazy_static;
+use prometheus::{
+    register_histogram_vec, register_int_counter_vec, register_int_gauge, HistogramVec,
+    IntCounterVec, IntGauge,
+};
 
 /// Macro to register a gauge metric
 macro_rules! register_gauge {
@@ -296,25 +299,25 @@ lazy_static! {
 }
 
 // Re-export commonly used metrics
-pub use command::{COUNTER as COMMAND_COUNTER, FAILURES as COMMAND_FAILURES, DURATION as COMMAND_DURATION};
-pub use http::{REQUESTS as HTTP_REQUESTS, DURATION as HTTP_DURATION};
-pub use process::{START_TIME as PROCESS_START_TIME, DB_POOL_CONNECTIONS, MEMORY_USAGE, CPU_USAGE};
-pub use discord::{GUILD_COUNT, USER_COUNT, CHANNEL_COUNT};
+pub use command::{
+    COUNTER as COMMAND_COUNTER, DURATION as COMMAND_DURATION, FAILURES as COMMAND_FAILURES,
+};
+pub use discord::{CHANNEL_COUNT, GUILD_COUNT, USER_COUNT};
 pub use guild::{
-    MEMBER_COUNT, CHANNEL_COUNT as GUILD_CHANNEL_COUNT, ROLE_COUNT, ONLINE_COUNT,
-    CREATION_TIME, HUMAN_COUNT, BOT_COUNT, TEXT_CHANNEL_COUNT, VOICE_CHANNEL_COUNT,
-    CATEGORY_CHANNEL_COUNT, EMOJI_COUNT, STICKER_COUNT, BOOST_COUNT,
-    PREMIUM_TIER, OWNER_ID, AFK_TIMEOUT
+    AFK_TIMEOUT, BOOST_COUNT, BOT_COUNT, CATEGORY_CHANNEL_COUNT,
+    CHANNEL_COUNT as GUILD_CHANNEL_COUNT, CREATION_TIME, EMOJI_COUNT, HUMAN_COUNT, MEMBER_COUNT,
+    ONLINE_COUNT, OWNER_ID, PREMIUM_TIER, ROLE_COUNT, STICKER_COUNT, TEXT_CHANNEL_COUNT,
+    VOICE_CHANNEL_COUNT,
 };
+pub use http::{DURATION as HTTP_DURATION, REQUESTS as HTTP_REQUESTS};
 pub use interaction::{
-    SLASH_COMMAND_USAGE, SLASH_COMMAND_DURATION, SLASH_COMMAND_FAILURES,
-    BUTTON_CLICKS, BUTTON_RESPONSE_TIME, BUTTON_FAILURES,
-    SELECT_MENU_USAGE, SELECT_MENU_RESPONSE_TIME, SELECT_MENU_FAILURES,
-    MODAL_SUBMISSIONS, MODAL_PROCESSING_TIME, MODAL_FAILURES,
-    CONTEXT_MENU_USAGE, CONTEXT_MENU_DURATION, CONTEXT_MENU_FAILURES,
-    AUTOCOMPLETE_REQUESTS, AUTOCOMPLETE_RESPONSE_TIME, AUTOCOMPLETE_FAILURES,
-    RATE_LIMIT_HITS, ACTIVE_INTERACTIONS
+    ACTIVE_INTERACTIONS, AUTOCOMPLETE_FAILURES, AUTOCOMPLETE_REQUESTS, AUTOCOMPLETE_RESPONSE_TIME,
+    BUTTON_CLICKS, BUTTON_FAILURES, BUTTON_RESPONSE_TIME, CONTEXT_MENU_DURATION,
+    CONTEXT_MENU_FAILURES, CONTEXT_MENU_USAGE, MODAL_FAILURES, MODAL_PROCESSING_TIME,
+    MODAL_SUBMISSIONS, RATE_LIMIT_HITS, SELECT_MENU_FAILURES, SELECT_MENU_RESPONSE_TIME,
+    SELECT_MENU_USAGE, SLASH_COMMAND_DURATION, SLASH_COMMAND_FAILURES, SLASH_COMMAND_USAGE,
 };
+pub use process::{CPU_USAGE, DB_POOL_CONNECTIONS, MEMORY_USAGE, START_TIME as PROCESS_START_TIME};
 
 pub fn record_http_request(endpoint: &str, method: &str) {
     HTTP_REQUESTS.with_label_values(&[endpoint, method]).inc();
@@ -325,7 +328,9 @@ pub fn record_command_execution(command: &str) {
 }
 
 pub fn record_command_duration(command: &str, duration: f64) {
-    COMMAND_DURATION.with_label_values(&[command]).observe(duration);
+    COMMAND_DURATION
+        .with_label_values(&[command])
+        .observe(duration);
 }
 
 pub fn update_guild_count(count: i64) {
@@ -338,61 +343,99 @@ pub fn update_member_count(count: i64) {
 
 // Helper functions for interaction metrics
 pub fn record_slash_command(command: &str, guild_id: &str, duration: f64) {
-    SLASH_COMMAND_USAGE.with_label_values(&[command, guild_id]).inc();
-    SLASH_COMMAND_DURATION.with_label_values(&[command, guild_id]).observe(duration);
+    SLASH_COMMAND_USAGE
+        .with_label_values(&[command, guild_id])
+        .inc();
+    SLASH_COMMAND_DURATION
+        .with_label_values(&[command, guild_id])
+        .observe(duration);
 }
 
 pub fn record_slash_command_failure(command: &str, guild_id: &str, error_type: &str) {
-    SLASH_COMMAND_FAILURES.with_label_values(&[command, guild_id, error_type]).inc();
+    SLASH_COMMAND_FAILURES
+        .with_label_values(&[command, guild_id, error_type])
+        .inc();
 }
 
 pub fn record_button_click(button_id: &str, guild_id: &str, response_time: f64) {
-    BUTTON_CLICKS.with_label_values(&[button_id, guild_id]).inc();
-    BUTTON_RESPONSE_TIME.with_label_values(&[button_id, guild_id]).observe(response_time);
+    BUTTON_CLICKS
+        .with_label_values(&[button_id, guild_id])
+        .inc();
+    BUTTON_RESPONSE_TIME
+        .with_label_values(&[button_id, guild_id])
+        .observe(response_time);
 }
 
 pub fn record_button_failure(button_id: &str, guild_id: &str, error_type: &str) {
-    BUTTON_FAILURES.with_label_values(&[button_id, guild_id, error_type]).inc();
+    BUTTON_FAILURES
+        .with_label_values(&[button_id, guild_id, error_type])
+        .inc();
 }
 
 pub fn record_select_menu_usage(menu_id: &str, guild_id: &str, response_time: f64) {
-    SELECT_MENU_USAGE.with_label_values(&[menu_id, guild_id]).inc();
-    SELECT_MENU_RESPONSE_TIME.with_label_values(&[menu_id, guild_id]).observe(response_time);
+    SELECT_MENU_USAGE
+        .with_label_values(&[menu_id, guild_id])
+        .inc();
+    SELECT_MENU_RESPONSE_TIME
+        .with_label_values(&[menu_id, guild_id])
+        .observe(response_time);
 }
 
 pub fn record_select_menu_failure(menu_id: &str, guild_id: &str, error_type: &str) {
-    SELECT_MENU_FAILURES.with_label_values(&[menu_id, guild_id, error_type]).inc();
+    SELECT_MENU_FAILURES
+        .with_label_values(&[menu_id, guild_id, error_type])
+        .inc();
 }
 
 pub fn record_modal_submission(modal_id: &str, guild_id: &str, processing_time: f64) {
-    MODAL_SUBMISSIONS.with_label_values(&[modal_id, guild_id]).inc();
-    MODAL_PROCESSING_TIME.with_label_values(&[modal_id, guild_id]).observe(processing_time);
+    MODAL_SUBMISSIONS
+        .with_label_values(&[modal_id, guild_id])
+        .inc();
+    MODAL_PROCESSING_TIME
+        .with_label_values(&[modal_id, guild_id])
+        .observe(processing_time);
 }
 
 pub fn record_modal_failure(modal_id: &str, guild_id: &str, error_type: &str) {
-    MODAL_FAILURES.with_label_values(&[modal_id, guild_id, error_type]).inc();
+    MODAL_FAILURES
+        .with_label_values(&[modal_id, guild_id, error_type])
+        .inc();
 }
 
 pub fn record_context_menu_usage(command: &str, guild_id: &str, duration: f64) {
-    CONTEXT_MENU_USAGE.with_label_values(&[command, guild_id]).inc();
-    CONTEXT_MENU_DURATION.with_label_values(&[command, guild_id]).observe(duration);
+    CONTEXT_MENU_USAGE
+        .with_label_values(&[command, guild_id])
+        .inc();
+    CONTEXT_MENU_DURATION
+        .with_label_values(&[command, guild_id])
+        .observe(duration);
 }
 
 pub fn record_context_menu_failure(command: &str, guild_id: &str, error_type: &str) {
-    CONTEXT_MENU_FAILURES.with_label_values(&[command, guild_id, error_type]).inc();
+    CONTEXT_MENU_FAILURES
+        .with_label_values(&[command, guild_id, error_type])
+        .inc();
 }
 
 pub fn record_autocomplete_request(command: &str, guild_id: &str, response_time: f64) {
-    AUTOCOMPLETE_REQUESTS.with_label_values(&[command, guild_id]).inc();
-    AUTOCOMPLETE_RESPONSE_TIME.with_label_values(&[command, guild_id]).observe(response_time);
+    AUTOCOMPLETE_REQUESTS
+        .with_label_values(&[command, guild_id])
+        .inc();
+    AUTOCOMPLETE_RESPONSE_TIME
+        .with_label_values(&[command, guild_id])
+        .observe(response_time);
 }
 
 pub fn record_autocomplete_failure(command: &str, guild_id: &str, error_type: &str) {
-    AUTOCOMPLETE_FAILURES.with_label_values(&[command, guild_id, error_type]).inc();
+    AUTOCOMPLETE_FAILURES
+        .with_label_values(&[command, guild_id, error_type])
+        .inc();
 }
 
 pub fn record_rate_limit_hit(interaction_type: &str, guild_id: &str) {
-    RATE_LIMIT_HITS.with_label_values(&[interaction_type, guild_id]).inc();
+    RATE_LIMIT_HITS
+        .with_label_values(&[interaction_type, guild_id])
+        .inc();
 }
 
 pub fn update_active_interactions(count: i64) {
@@ -411,11 +454,16 @@ mod tests {
 
         // Test command execution recording
         record_command_execution("test_command");
-        assert_eq!(COMMAND_COUNTER.with_label_values(&["test_command"]).get(), 1);
+        assert_eq!(
+            COMMAND_COUNTER.with_label_values(&["test_command"]).get(),
+            1
+        );
 
         // Test command duration recording
         record_command_duration("test_command", 1.5);
-        let duration = COMMAND_DURATION.with_label_values(&["test_command"]).get_sample_sum();
+        let duration = COMMAND_DURATION
+            .with_label_values(&["test_command"])
+            .get_sample_sum();
         assert!(duration > 0.0);
 
         // Test guild and member count updates
@@ -427,25 +475,60 @@ mod tests {
 
         // Test interaction metrics
         record_slash_command("test_command", "123", 0.5);
-        assert_eq!(SLASH_COMMAND_USAGE.with_label_values(&["test_command", "123"]).get(), 1);
+        assert_eq!(
+            SLASH_COMMAND_USAGE
+                .with_label_values(&["test_command", "123"])
+                .get(),
+            1
+        );
 
         record_button_click("test_button", "123", 0.2);
-        assert_eq!(BUTTON_CLICKS.with_label_values(&["test_button", "123"]).get(), 1);
+        assert_eq!(
+            BUTTON_CLICKS
+                .with_label_values(&["test_button", "123"])
+                .get(),
+            1
+        );
 
         record_select_menu_usage("test_menu", "123", 0.3);
-        assert_eq!(SELECT_MENU_USAGE.with_label_values(&["test_menu", "123"]).get(), 1);
+        assert_eq!(
+            SELECT_MENU_USAGE
+                .with_label_values(&["test_menu", "123"])
+                .get(),
+            1
+        );
 
         record_modal_submission("test_modal", "123", 0.4);
-        assert_eq!(MODAL_SUBMISSIONS.with_label_values(&["test_modal", "123"]).get(), 1);
+        assert_eq!(
+            MODAL_SUBMISSIONS
+                .with_label_values(&["test_modal", "123"])
+                .get(),
+            1
+        );
 
         record_context_menu_usage("test_context", "123", 0.6);
-        assert_eq!(CONTEXT_MENU_USAGE.with_label_values(&["test_context", "123"]).get(), 1);
+        assert_eq!(
+            CONTEXT_MENU_USAGE
+                .with_label_values(&["test_context", "123"])
+                .get(),
+            1
+        );
 
         record_autocomplete_request("test_command", "123", 0.1);
-        assert_eq!(AUTOCOMPLETE_REQUESTS.with_label_values(&["test_command", "123"]).get(), 1);
+        assert_eq!(
+            AUTOCOMPLETE_REQUESTS
+                .with_label_values(&["test_command", "123"])
+                .get(),
+            1
+        );
 
         record_rate_limit_hit("slash_command", "123");
-        assert_eq!(RATE_LIMIT_HITS.with_label_values(&["slash_command", "123"]).get(), 1);
+        assert_eq!(
+            RATE_LIMIT_HITS
+                .with_label_values(&["slash_command", "123"])
+                .get(),
+            1
+        );
 
         update_active_interactions(5);
         assert_eq!(ACTIVE_INTERACTIONS.get(), 5);

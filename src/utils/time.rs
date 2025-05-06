@@ -1,5 +1,5 @@
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use crate::utils::system::SystemError;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Get the current time in seconds since epoch
 pub fn get_current_time() -> Result<i64, SystemError> {
@@ -23,15 +23,21 @@ pub fn format_duration(seconds: i64) -> String {
     if seconds < SECONDS_PER_MINUTE {
         format!("{}s", seconds)
     } else if seconds < SECONDS_PER_HOUR {
-        format!("{}m {}s", seconds / SECONDS_PER_MINUTE, seconds % SECONDS_PER_MINUTE)
+        format!(
+            "{}m {}s",
+            seconds / SECONDS_PER_MINUTE,
+            seconds % SECONDS_PER_MINUTE
+        )
     } else if seconds < SECONDS_PER_DAY {
-        format!("{}h {}m", 
-            seconds / SECONDS_PER_HOUR, 
+        format!(
+            "{}h {}m",
+            seconds / SECONDS_PER_HOUR,
             (seconds % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE
         )
     } else {
-        format!("{}d {}h", 
-            seconds / SECONDS_PER_DAY, 
+        format!(
+            "{}d {}h",
+            seconds / SECONDS_PER_DAY,
             (seconds % SECONDS_PER_DAY) / SECONDS_PER_HOUR
         )
     }
@@ -68,13 +74,7 @@ pub fn is_within_duration(time: i64, duration: Duration) -> Result<bool, SystemE
 
 /// Get the remaining time until a timestamp
 pub fn get_remaining_time(end_time: i64) -> Result<i64, SystemError> {
-    get_current_time().map(|now| {
-        if end_time > now {
-            end_time - now
-        } else {
-            0
-        }
-    })
+    get_current_time().map(|now| if end_time > now { end_time - now } else { 0 })
 }
 
 /// Format the remaining time until a timestamp
@@ -130,4 +130,4 @@ mod tests {
         assert_eq!(format_timestamp(90), "1m 30s");
         assert_eq!(format_timestamp(3661), "1h 1m 1s");
     }
-} 
+}

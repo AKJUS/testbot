@@ -1,5 +1,7 @@
-use poise::serenity_prelude::{Guild, GuildId, UserId, Member, ChannelId, GuildChannel, ChannelType, PremiumTier};
 use crate::Data;
+use poise::serenity_prelude::{
+    ChannelId, ChannelType, Guild, GuildChannel, GuildId, Member, PremiumTier, UserId,
+};
 use std::collections::HashMap;
 
 /// Trait for collecting metrics from guild data
@@ -24,9 +26,9 @@ pub fn get_creation_time(guild: &Guild) -> i64 {
 }
 
 /// Count members in a guild that match a predicate
-pub fn count_members<F>(guild: &Guild, predicate: F) -> usize 
+pub fn count_members<F>(guild: &Guild, predicate: F) -> usize
 where
-    F: Fn(&Member) -> bool
+    F: Fn(&Member) -> bool,
 {
     guild.members.values().filter(|m| predicate(m)).count()
 }
@@ -36,7 +38,9 @@ pub fn count_channels<F>(guild: &Guild, predicate: F) -> i64
 where
     F: Fn(&GuildChannel) -> bool,
 {
-    guild.channels.values()
+    guild
+        .channels
+        .values()
         .filter(|channel| predicate(channel))
         .count() as i64
 }
@@ -53,7 +57,9 @@ pub fn count_bots(guild: &Guild) -> usize {
 
 /// Count online members in a guild
 pub fn count_online_members(guild: &Guild) -> usize {
-    guild.members.values()
+    guild
+        .members
+        .values()
         .filter(|m| m.presence.as_ref().map_or(false, |p| p.status.is_online()))
         .count()
 }
@@ -70,7 +76,9 @@ pub fn count_voice_channels(guild: &Guild) -> i64 {
 
 /// Get the number of category channels in a guild
 pub fn count_categories(guild: &Guild) -> i64 {
-    count_channels(guild, |channel| matches!(channel.kind, ChannelType::Category))
+    count_channels(guild, |channel| {
+        matches!(channel.kind, ChannelType::Category)
+    })
 }
 
 /// Get the number of emojis in a guild
@@ -132,15 +140,15 @@ pub fn get_user_count(guilds: &HashMap<GuildId, Guild>) -> usize {
 
 /// Get the total number of channels across all guilds
 pub fn get_channel_count(guilds: &HashMap<GuildId, Guild>) -> usize {
-    guilds.values()
-        .map(|g| g.channels.len())
-        .sum()
+    guilds.values().map(|g| g.channels.len()).sum()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use poise::serenity_prelude::{User, GuildId, Member, ChannelId, GuildChannel, ChannelType, PremiumTier};
+    use poise::serenity_prelude::{
+        ChannelId, ChannelType, GuildChannel, GuildId, Member, PremiumTier, User,
+    };
     use std::collections::HashMap;
 
     fn create_test_guild() -> Guild {
@@ -235,7 +243,7 @@ mod tests {
     #[test]
     fn test_guild_utilities() {
         let guild = create_test_guild();
-        
+
         assert_eq!(get_afk_timeout(&guild), Some(300));
         assert_eq!(count_members(&guild, |_| true), 2);
         assert_eq!(get_premium_tier(&guild), 1);
@@ -243,12 +251,12 @@ mod tests {
         assert_eq!(count_bots(&guild), 1);
         assert_eq!(count_text_channels(&guild), 1);
         assert_eq!(count_voice_channels(&guild), 1);
-        
+
         let mut guilds = HashMap::new();
         guilds.insert(guild.id, guild);
-        
+
         assert_eq!(get_guild_count(&guilds), 1);
         assert_eq!(get_user_count(&guilds), 2);
         assert_eq!(get_channel_count(&guilds), 2);
     }
-} 
+}

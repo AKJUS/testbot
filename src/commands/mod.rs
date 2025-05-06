@@ -1,22 +1,22 @@
-use diesel::prelude::*;
-use chrono::Utc;
-use crate::schema::{command_history, command_stats};
-use crate::models::{CommandHistory, CommandStat};
+use crate::db::DbPool;
 use crate::db::Pool;
 use crate::metrics;
+use crate::models::{CommandHistory, CommandStat};
+use crate::schema::{command_history, command_stats};
 use crate::utils::time::get_current_time;
-use diesel::r2d2::{ConnectionManager, PooledConnection};
-use poise::serenity_prelude::{Context, User};
-use std::error::Error;
-use mockall::predicate::*;
-use mockall::mock;
-use diesel::PgConnection;
 use crate::Data;
-use crate::db::DbPool;
-use diesel::dsl::count;
-use poise::serenity_prelude::{User, UserId};
-use std::time::{Duration, Instant};
 use chrono::NaiveDateTime;
+use chrono::Utc;
+use diesel::dsl::count;
+use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, PooledConnection};
+use diesel::PgConnection;
+use mockall::mock;
+use mockall::predicate::*;
+use poise::serenity_prelude::{Context, User};
+use poise::serenity_prelude::{User, UserId};
+use std::error::Error;
+use std::time::{Duration, Instant};
 
 pub mod advice;
 pub mod ball;
@@ -69,7 +69,12 @@ impl CommandContext {
 }
 
 /// Log a command execution to the database
-pub async fn log_command(pool: &DbPool, command: &str, args: &[String], user: &User) -> Result<(), Box<dyn Error>> {
+pub async fn log_command(
+    pool: &DbPool,
+    command: &str,
+    args: &[String],
+    user: &User,
+) -> Result<(), Box<dyn Error>> {
     use crate::schema::command_history;
     let conn = &mut pool.get()?;
 
@@ -86,7 +91,11 @@ pub async fn log_command(pool: &DbPool, command: &str, args: &[String], user: &U
 }
 
 /// Update command statistics in the database
-pub async fn update_command_stats(pool: &DbPool, command: &str, args: &[String]) -> Result<(), Box<dyn Error>> {
+pub async fn update_command_stats(
+    pool: &DbPool,
+    command: &str,
+    args: &[String],
+) -> Result<(), Box<dyn Error>> {
     use crate::schema::command_stats;
     let conn = &mut pool.get()?;
     let now = chrono::Utc::now().naive_utc();
@@ -131,9 +140,9 @@ pub async fn execute_command(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::establish_connection;
     use diesel::r2d2::ConnectionManager;
     use diesel::PgConnection;
-    use crate::db::establish_connection;
 
     mock! {
         PgConnection {}
@@ -152,7 +161,7 @@ mod tests {
             .expect("Failed to create pool");
         let mut conn = pool.get().unwrap();
         let user = User::new(UserId::new(123));
-        
+
         assert!(log_command(&mut conn, &user, "test_command").is_ok());
     }
 
@@ -166,13 +175,16 @@ mod tests {
             .expect("Failed to create pool");
         let mut conn = pool.get().unwrap();
         let user = User::new(UserId::new(123));
-        
+
         assert!(update_command_stats(&mut conn, "test_command", &user).is_ok());
     }
 
     #[test]
     fn test_command_context() {
-        let ctx = CommandContext::new("test".to_string(), vec!["arg1".to_string(), "arg2".to_string()]);
+        let ctx = CommandContext::new(
+            "test".to_string(),
+            vec!["arg1".to_string(), "arg2".to_string()],
+        );
         assert_eq!(ctx.command, "test");
         assert_eq!(ctx.args, vec!["arg1", "arg2"]);
         assert!(ctx.duration() < Duration::from_secs(1));

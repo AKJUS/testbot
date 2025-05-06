@@ -1,8 +1,8 @@
 mod commands;
+mod metrics;
 mod models;
 mod schema;
 mod utils;
-mod metrics;
 
 // #[macro_use]
 // extern crate diesel;
@@ -16,26 +16,32 @@ use poise::{
     serenity_prelude::{ClientBuilder, GatewayIntents},
 };
 // use std::error::Error;
-use axum::{Router, response::Html};
+use crate::models::CommandHistory;
 use axum::routing::get;
-use std::sync::Arc;
-use tokio::sync::Mutex as TokioMutex;
+use axum::{response::Html, Router};
 use chrono::Utc;
 use diesel::prelude::*;
-use crate::models::CommandHistory;
-use diesel_migrations::{MigrationHarness, EmbeddedMigrations, embed_migrations};
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use std::sync::Arc;
+use tokio::sync::Mutex as TokioMutex;
 // All use statements above
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 use axum::serve;
-use tokio::net::TcpListener;
-use prometheus::{IntCounterVec, IntGauge, HistogramVec, register_int_counter_vec, register_histogram_vec, register_int_gauge, HistogramTimer};
-use utils::{set_process_metrics, update_resource_metrics, update_discord_metrics, update_guild_metrics, prometheus_metrics};
-use tower_http::trace::{TraceLayer, DefaultMakeSpan};
-use tracing::Level;
-use tracing::error;
+use poise::serenity_prelude::{ChannelId, Guild, GuildChannel, GuildId, User, UserId};
+use prometheus::{
+    register_histogram_vec, register_int_counter_vec, register_int_gauge, HistogramTimer,
+    HistogramVec, IntCounterVec, IntGauge,
+};
 use std::collections::HashMap;
+use tokio::net::TcpListener;
 use tokio::sync::RwLock;
-use poise::serenity_prelude::{GuildId, Guild, UserId, User, ChannelId, GuildChannel};
+use tower_http::trace::{DefaultMakeSpan, TraceLayer};
+use tracing::error;
+use tracing::Level;
+use utils::{
+    prometheus_metrics, set_process_metrics, update_discord_metrics, update_guild_metrics,
+    update_resource_metrics,
+};
 
 use commands::{
     advice::advice,
@@ -46,10 +52,10 @@ use commands::{
     food::food,
     github::github,
     owner::quit,
-    pingpong::{ping},
+    pingpong::ping,
     random::random,
-    stonks::{graph, stonkcomp, stonks},
     stats::stats,
+    stonks::{graph, stonkcomp, stonks},
 };
 
 // use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
@@ -196,7 +202,12 @@ async fn bot_info() -> Html<String> {
     Html(format!("<h1>TestBot</h1><p>Configuration: ...</p>"))
 }
 
-async fn command_history_handler(pool: axum::extract::Extension<Arc<TokioMutex<diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<PgConnection>>>>>, config: axum::extract::Extension<WebConfig>) -> Html<String> {
+async fn command_history_handler(
+    pool: axum::extract::Extension<
+        Arc<TokioMutex<diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<PgConnection>>>>,
+    >,
+    config: axum::extract::Extension<WebConfig>,
+) -> Html<String> {
     let pool = pool.lock().await;
     let mut conn = pool.get().unwrap();
     let cutoff = Utc::now().naive_utc() - chrono::Duration::days(config.history_retention_days);
@@ -206,11 +217,22 @@ async fn command_history_handler(pool: axum::extract::Extension<Arc<TokioMutex<d
         .order(timestamp.desc())
         .load(&mut conn)
         .unwrap_or_default();
-    let html = history.iter().map(|h| format!("<li>[{}] {}: {}</li>", h.timestamp, h.user, h.command)).collect::<Vec<_>>().join("");
-    Html(format!("<h2>Command History (last {} days)</h2><ul>{}</ul>", config.history_retention_days, html))
+    let html = history
+        .iter()
+        .map(|h| format!("<li>[{}] {}: {}</li>", h.timestamp, h.user, h.command))
+        .collect::<Vec<_>>()
+        .join("");
+    Html(format!(
+        "<h2>Command History (last {} days)</h2><ul>{}</ul>",
+        config.history_retention_days, html
+    ))
 }
 
-async fn stats_handler(_pool: axum::extract::Extension<Arc<TokioMutex<diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<PgConnection>>>>>) -> Html<String> {
+async fn stats_handler(
+    _pool: axum::extract::Extension<
+        Arc<TokioMutex<diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<PgConnection>>>>,
+    >,
+) -> Html<String> {
     let html = r#"
 <!DOCTYPE html>
 <html lang=\"en\">
@@ -260,7 +282,11 @@ async fn stats_handler(_pool: axum::extract::Extension<Arc<TokioMutex<diesel::r2
 }
 
 // New handler for /stats/data (returns just the table rows)
-async fn stats_data_handler(pool: axum::extract::Extension<Arc<TokioMutex<diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<PgConnection>>>>>) -> Html<String> {
+async fn stats_data_handler(
+    pool: axum::extract::Extension<
+        Arc<TokioMutex<diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<PgConnection>>>>,
+    >,
+) -> Html<String> {
     let pool = pool.lock().await;
     let mut conn = pool.get().unwrap();
     use crate::schema::command_stats::dsl::*;
@@ -289,42 +315,80 @@ struct Handler;
 
 #[poise::serenity_prelude::async_trait]
 impl poise::serenity_prelude::EventHandler for Handler {
-    async fn ready(&self, ctx: poise::serenity_prelude::Context, _ready: poise::serenity_prelude::Ready) {
+    async fn ready(
+        &self,
+        ctx: poise::serenity_prelude::Context,
+        _ready: poise::serenity_prelude::Ready,
+    ) {
         update_discord_metrics(&ctx);
         update_guild_metrics(&ctx);
     }
 
-    async fn guild_create(&self, ctx: poise::serenity_prelude::Context, _guild: poise::serenity_prelude::Guild, _is_new: Option<bool>) {
+    async fn guild_create(
+        &self,
+        ctx: poise::serenity_prelude::Context,
+        _guild: poise::serenity_prelude::Guild,
+        _is_new: Option<bool>,
+    ) {
         update_discord_metrics(&ctx);
         update_guild_metrics(&ctx);
     }
 
-    async fn guild_delete(&self, ctx: poise::serenity_prelude::Context, _incomplete: poise::serenity_prelude::UnavailableGuild, _full: Option<poise::serenity_prelude::Guild>) {
+    async fn guild_delete(
+        &self,
+        ctx: poise::serenity_prelude::Context,
+        _incomplete: poise::serenity_prelude::UnavailableGuild,
+        _full: Option<poise::serenity_prelude::Guild>,
+    ) {
         update_discord_metrics(&ctx);
         update_guild_metrics(&ctx);
     }
 
-    async fn guild_update(&self, ctx: poise::serenity_prelude::Context, _old: Option<poise::serenity_prelude::Guild>, _new: poise::serenity_prelude::PartialGuild) {
+    async fn guild_update(
+        &self,
+        ctx: poise::serenity_prelude::Context,
+        _old: Option<poise::serenity_prelude::Guild>,
+        _new: poise::serenity_prelude::PartialGuild,
+    ) {
         update_discord_metrics(&ctx);
         update_guild_metrics(&ctx);
     }
 
-    async fn channel_create(&self, ctx: poise::serenity_prelude::Context, _channel: poise::serenity_prelude::GuildChannel) {
+    async fn channel_create(
+        &self,
+        ctx: poise::serenity_prelude::Context,
+        _channel: poise::serenity_prelude::GuildChannel,
+    ) {
         update_discord_metrics(&ctx);
         update_guild_metrics(&ctx);
     }
 
-    async fn channel_delete(&self, ctx: poise::serenity_prelude::Context, _channel: poise::serenity_prelude::GuildChannel, _messages: Option<Vec<poise::serenity_prelude::Message>>) {
+    async fn channel_delete(
+        &self,
+        ctx: poise::serenity_prelude::Context,
+        _channel: poise::serenity_prelude::GuildChannel,
+        _messages: Option<Vec<poise::serenity_prelude::Message>>,
+    ) {
         update_discord_metrics(&ctx);
         update_guild_metrics(&ctx);
     }
 
-    async fn channel_update(&self, ctx: poise::serenity_prelude::Context, _old: Option<poise::serenity_prelude::GuildChannel>, _new: poise::serenity_prelude::GuildChannel) {
+    async fn channel_update(
+        &self,
+        ctx: poise::serenity_prelude::Context,
+        _old: Option<poise::serenity_prelude::GuildChannel>,
+        _new: poise::serenity_prelude::GuildChannel,
+    ) {
         update_discord_metrics(&ctx);
         update_guild_metrics(&ctx);
     }
 
-    async fn user_update(&self, ctx: poise::serenity_prelude::Context, _old: Option<poise::serenity_prelude::CurrentUser>, _new: poise::serenity_prelude::CurrentUser) {
+    async fn user_update(
+        &self,
+        ctx: poise::serenity_prelude::Context,
+        _old: Option<poise::serenity_prelude::CurrentUser>,
+        _new: poise::serenity_prelude::CurrentUser,
+    ) {
         update_discord_metrics(&ctx);
         update_guild_metrics(&ctx);
     }
@@ -366,10 +430,16 @@ async fn main() -> Result<(), Error> {
     // Run migrations automatically
     {
         let mut conn = db_pool.get().unwrap();
-        conn.run_pending_migrations(MIGRATIONS).expect("Failed to run database migrations");
+        conn.run_pending_migrations(MIGRATIONS)
+            .expect("Failed to run database migrations");
     }
-    let history_retention_days = std::env::var("HISTORY_RETENTION_DAYS").ok().and_then(|s| s.parse().ok()).unwrap_or(30);
-    let web_config = WebConfig { history_retention_days };
+    let history_retention_days = std::env::var("HISTORY_RETENTION_DAYS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(30);
+    let web_config = WebConfig {
+        history_retention_days,
+    };
     let pool = Arc::new(TokioMutex::new(db_pool.clone()));
     // Prune old command history
     {
@@ -393,25 +463,31 @@ async fn main() -> Result<(), Error> {
             graph(),
             stats(),
         ],
-        pre_command: |ctx| Box::pin(async move {
-            let pool = &ctx.data().db_pool;
-            let mut conn = pool.get().unwrap();
-            let command = ctx.command().name.clone();
-            let user = ctx.author().id.to_string();
-            crate::commands::log_command(&mut conn, &user, &command);
-            crate::commands::update_command_stats(&mut conn, &command, &command);
-            COMMAND_COUNTER.with_label_values(&[&command]).inc();
-            let timer = COMMAND_DURATION.with_label_values(&[&command]).start_timer();
-            let mut timers = ctx.data().command_timers.lock().await;
-            timers.insert(command.clone(), timer);
-        }),
-        post_command: |ctx| Box::pin(async move {
-            let command = ctx.command().name.clone();
-            let mut timers = ctx.data().command_timers.lock().await;
-            if let Some(timer) = timers.remove(&command) {
-                timer.observe_duration();
-            }
-        }),
+        pre_command: |ctx| {
+            Box::pin(async move {
+                let pool = &ctx.data().db_pool;
+                let mut conn = pool.get().unwrap();
+                let command = ctx.command().name.clone();
+                let user = ctx.author().id.to_string();
+                crate::commands::log_command(&mut conn, &user, &command);
+                crate::commands::update_command_stats(&mut conn, &command, &command);
+                COMMAND_COUNTER.with_label_values(&[&command]).inc();
+                let timer = COMMAND_DURATION
+                    .with_label_values(&[&command])
+                    .start_timer();
+                let mut timers = ctx.data().command_timers.lock().await;
+                timers.insert(command.clone(), timer);
+            })
+        },
+        post_command: |ctx| {
+            Box::pin(async move {
+                let command = ctx.command().name.clone();
+                let mut timers = ctx.data().command_timers.lock().await;
+                if let Some(timer) = timers.remove(&command) {
+                    timer.observe_duration();
+                }
+            })
+        },
         on_error: |error| Box::pin(on_error(error)),
         ..Default::default()
     };
@@ -419,7 +495,15 @@ async fn main() -> Result<(), Error> {
         .options(options)
         .setup(move |_ctx, _ready, _framework| {
             let db_pool = db_pool.clone();
-            Box::pin(async move { Ok(Data { db_pool, command_timers: Arc::new(TokioMutex::new(HashMap::new())), guilds: Arc::new(RwLock::new(HashMap::new())), users: Arc::new(RwLock::new(HashMap::new())), channels: Arc::new(RwLock::new(HashMap::new())) }) })
+            Box::pin(async move {
+                Ok(Data {
+                    db_pool,
+                    command_timers: Arc::new(TokioMutex::new(HashMap::new())),
+                    guilds: Arc::new(RwLock::new(HashMap::new())),
+                    users: Arc::new(RwLock::new(HashMap::new())),
+                    channels: Arc::new(RwLock::new(HashMap::new())),
+                })
+            })
         })
         .build();
     let mut client = ClientBuilder::new(
@@ -430,7 +514,10 @@ async fn main() -> Result<(), Error> {
     .event_handler(Handler)
     .await?;
     client.start().await?;
-    let web_port: u16 = std::env::var("WEB_PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(8080);
+    let web_port: u16 = std::env::var("WEB_PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(8080);
     let app = Router::new()
         .route("/", get(bot_info))
         .route("/history", get(command_history_handler))
@@ -445,8 +532,10 @@ async fn main() -> Result<(), Error> {
                 .on_request(|request: &axum::http::Request<_>, _span: &tracing::Span| {
                     let method = request.method().as_str();
                     let path = request.uri().path();
-                    metrics::HTTP_REQUESTS.with_label_values(&[&path.to_string(), &method.to_string()]).inc();
-                })
+                    metrics::HTTP_REQUESTS
+                        .with_label_values(&[&path.to_string(), &method.to_string()])
+                        .inc();
+                }),
         );
     tokio::spawn(async move {
         let listener = TcpListener::bind(("0.0.0.0", web_port)).await.unwrap();
