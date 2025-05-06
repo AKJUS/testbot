@@ -19,7 +19,7 @@ use poise::{
 use axum::{Router, response::Html};
 use axum::routing::get;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::Mutex as TokioMutex;
 use chrono::Utc;
 use diesel::prelude::*;
 use crate::models::CommandHistory;
@@ -28,10 +28,14 @@ use diesel_migrations::{MigrationHarness, EmbeddedMigrations, embed_migrations};
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 use axum::serve;
 use tokio::net::TcpListener;
-use prometheus::{IntCounterVec, IntGauge, HistogramVec, register_int_counter_vec, register_histogram_vec, register_int_gauge};
+use prometheus::{IntCounterVec, IntGauge, HistogramVec, register_int_counter_vec, register_histogram_vec, register_int_gauge, HistogramTimer};
 use utils::{set_process_metrics, update_resource_metrics, update_discord_metrics, update_guild_metrics, prometheus_metrics};
 use tower_http::trace::{TraceLayer, DefaultMakeSpan};
 use tracing::Level;
+use tracing::error;
+use std::collections::HashMap;
+use tokio::sync::RwLock;
+use poise::serenity_prelude::{GuildId, Guild, UserId, User, ChannelId, GuildChannel};
 
 use commands::{
     advice::advice,
@@ -54,6 +58,10 @@ use commands::{
 type Error = Box<dyn std::error::Error + Send + Sync>;
 pub struct Data {
     pub db_pool: Pool<ConnectionManager<PgConnection>>,
+    pub command_timers: Arc<RwLock<HashMap<String, f64>>>,
+    pub guilds: Arc<RwLock<HashMap<GuildId, Guild>>>,
+    pub users: Arc<RwLock<HashMap<UserId, User>>>,
+    pub channels: Arc<RwLock<HashMap<ChannelId, GuildChannel>>>,
 }
 
 // pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
@@ -188,7 +196,7 @@ async fn bot_info() -> Html<String> {
     Html(format!("<h1>TestBot</h1><p>Configuration: ...</p>"))
 }
 
-async fn command_history_handler(pool: axum::extract::Extension<Arc<Mutex<diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<PgConnection>>>>>, config: axum::extract::Extension<WebConfig>) -> Html<String> {
+async fn command_history_handler(pool: axum::extract::Extension<Arc<TokioMutex<diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<PgConnection>>>>>, config: axum::extract::Extension<WebConfig>) -> Html<String> {
     let pool = pool.lock().await;
     let mut conn = pool.get().unwrap();
     let cutoff = Utc::now().naive_utc() - chrono::Duration::days(config.history_retention_days);
@@ -202,7 +210,7 @@ async fn command_history_handler(pool: axum::extract::Extension<Arc<Mutex<diesel
     Html(format!("<h2>Command History (last {} days)</h2><ul>{}</ul>", config.history_retention_days, html))
 }
 
-async fn stats_handler(pool: axum::extract::Extension<Arc<Mutex<diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<PgConnection>>>>>) -> Html<String> {
+async fn stats_handler(_pool: axum::extract::Extension<Arc<TokioMutex<diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<PgConnection>>>>>) -> Html<String> {
     let html = r#"
 <!DOCTYPE html>
 <html lang=\"en\">
@@ -252,7 +260,7 @@ async fn stats_handler(pool: axum::extract::Extension<Arc<Mutex<diesel::r2d2::Po
 }
 
 // New handler for /stats/data (returns just the table rows)
-async fn stats_data_handler(pool: axum::extract::Extension<Arc<Mutex<diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<PgConnection>>>>>) -> Html<String> {
+async fn stats_data_handler(pool: axum::extract::Extension<Arc<TokioMutex<diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<PgConnection>>>>>) -> Html<String> {
     let pool = pool.lock().await;
     let mut conn = pool.get().unwrap();
     use crate::schema::command_stats::dsl::*;
@@ -274,6 +282,66 @@ async fn stats_data_handler(pool: axum::extract::Extension<Arc<Mutex<diesel::r2d
 // Add a /metrics endpoint for Prometheus
 async fn metrics_handler() -> Html<String> {
     Html(prometheus_metrics())
+}
+
+// Add this before the main function
+struct Handler;
+
+#[poise::serenity_prelude::async_trait]
+impl poise::serenity_prelude::EventHandler for Handler {
+    async fn ready(&self, ctx: poise::serenity_prelude::Context, _ready: poise::serenity_prelude::Ready) {
+        update_discord_metrics(&ctx);
+        update_guild_metrics(&ctx);
+    }
+
+    async fn guild_create(&self, ctx: poise::serenity_prelude::Context, _guild: poise::serenity_prelude::Guild, _is_new: Option<bool>) {
+        update_discord_metrics(&ctx);
+        update_guild_metrics(&ctx);
+    }
+
+    async fn guild_delete(&self, ctx: poise::serenity_prelude::Context, _incomplete: poise::serenity_prelude::UnavailableGuild, _full: Option<poise::serenity_prelude::Guild>) {
+        update_discord_metrics(&ctx);
+        update_guild_metrics(&ctx);
+    }
+
+    async fn guild_update(&self, ctx: poise::serenity_prelude::Context, _old: Option<poise::serenity_prelude::Guild>, _new: poise::serenity_prelude::PartialGuild) {
+        update_discord_metrics(&ctx);
+        update_guild_metrics(&ctx);
+    }
+
+    async fn channel_create(&self, ctx: poise::serenity_prelude::Context, _channel: poise::serenity_prelude::GuildChannel) {
+        update_discord_metrics(&ctx);
+        update_guild_metrics(&ctx);
+    }
+
+    async fn channel_delete(&self, ctx: poise::serenity_prelude::Context, _channel: poise::serenity_prelude::GuildChannel, _messages: Option<Vec<poise::serenity_prelude::Message>>) {
+        update_discord_metrics(&ctx);
+        update_guild_metrics(&ctx);
+    }
+
+    async fn channel_update(&self, ctx: poise::serenity_prelude::Context, _old: Option<poise::serenity_prelude::GuildChannel>, _new: poise::serenity_prelude::GuildChannel) {
+        update_discord_metrics(&ctx);
+        update_guild_metrics(&ctx);
+    }
+
+    async fn user_update(&self, ctx: poise::serenity_prelude::Context, _old: Option<poise::serenity_prelude::CurrentUser>, _new: poise::serenity_prelude::CurrentUser) {
+        update_discord_metrics(&ctx);
+        update_guild_metrics(&ctx);
+    }
+}
+
+async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
+    match error {
+        poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {:?}", error),
+        poise::FrameworkError::Command { error, ctx, .. } => {
+            error!("Error in command `{}`: {:?}", ctx.command().name, error);
+        }
+        error => {
+            if let Err(e) = poise::builtins::on_error(error).await {
+                error!("Error while handling error: {}", e);
+            }
+        }
+    }
 }
 
 // --- Poise bot entry point ---
@@ -302,7 +370,7 @@ async fn main() -> Result<(), Error> {
     }
     let history_retention_days = std::env::var("HISTORY_RETENTION_DAYS").ok().and_then(|s| s.parse().ok()).unwrap_or(30);
     let web_config = WebConfig { history_retention_days };
-    let pool = Arc::new(Mutex::new(db_pool.clone()));
+    let pool = Arc::new(TokioMutex::new(db_pool.clone()));
     // Prune old command history
     {
         let mut conn = db_pool.get().unwrap();
@@ -325,41 +393,33 @@ async fn main() -> Result<(), Error> {
             graph(),
             stats(),
         ],
-        pre_command: |ctx| {
-            let user = ctx.author().name.clone();
-            let command = ctx.command().qualified_name.clone();
+        pre_command: |ctx| Box::pin(async move {
             let pool = &ctx.data().db_pool;
             let mut conn = pool.get().unwrap();
+            let command = ctx.command().name.clone();
+            let user = ctx.author().id.to_string();
             crate::commands::log_command(&mut conn, &user, &command);
-            let args = ctx.args().join(" ");
-            crate::commands::update_command_stats(&mut conn, &command, &args);
-            // Increment Prometheus counter
+            crate::commands::update_command_stats(&mut conn, &command, &command);
             COMMAND_COUNTER.with_label_values(&[&command]).inc();
-            // Start timer for command duration
             let timer = COMMAND_DURATION.with_label_values(&[&command]).start_timer();
-            ctx.data().insert("__command_timer__", timer);
-            Box::pin(async {})
-        },
-        post_command: |ctx, _result| {
-            let command = ctx.command().qualified_name.clone();
-            // Stop timer for command duration
-            if let Some(timer) = ctx.data().remove::<prometheus::HistogramTimer>("__command_timer__") {
+            let mut timers = ctx.data().command_timers.lock().await;
+            timers.insert(command.clone(), timer);
+        }),
+        post_command: |ctx| Box::pin(async move {
+            let command = ctx.command().name.clone();
+            let mut timers = ctx.data().command_timers.lock().await;
+            if let Some(timer) = timers.remove(&command) {
                 timer.observe_duration();
             }
-            Box::pin(async {})
-        },
-        on_error: |err| {
-            let command = err.ctx().map(|c| c.command().qualified_name.clone()).unwrap_or_else(|| "unknown".to_string());
-            COMMAND_FAILURES.with_label_values(&[&command]).inc();
-            Box::pin(async move { poise::FrameworkError::continue_(err).await })
-        },
+        }),
+        on_error: |error| Box::pin(on_error(error)),
         ..Default::default()
     };
     let framework = poise::Framework::builder()
         .options(options)
         .setup(move |_ctx, _ready, _framework| {
             let db_pool = db_pool.clone();
-            Box::pin(async move { Ok(Data { db_pool }) })
+            Box::pin(async move { Ok(Data { db_pool, command_timers: Arc::new(TokioMutex::new(HashMap::new())), guilds: Arc::new(RwLock::new(HashMap::new())), users: Arc::new(RwLock::new(HashMap::new())), channels: Arc::new(RwLock::new(HashMap::new())) }) })
         })
         .build();
     let mut client = ClientBuilder::new(
@@ -367,25 +427,7 @@ async fn main() -> Result<(), Error> {
         GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT,
     )
     .framework(framework)
-    .event_handler(|ctx, event| {
-        Box::pin(async move {
-            match event {
-                poise::serenity_prelude::Event::Ready { .. }
-                | poise::serenity_prelude::Event::GuildCreate { .. }
-                | poise::serenity_prelude::Event::GuildDelete { .. }
-                | poise::serenity_prelude::Event::GuildUpdate { .. }
-                | poise::serenity_prelude::Event::ChannelCreate { .. }
-                | poise::serenity_prelude::Event::ChannelDelete { .. }
-                | poise::serenity_prelude::Event::ChannelUpdate { .. }
-                | poise::serenity_prelude::Event::MemberUpdate { .. }
-                | poise::serenity_prelude::Event::PresenceUpdate { .. } => {
-                    update_discord_metrics(&ctx);
-                    update_guild_metrics(&ctx);
-                },
-                _ => {}
-            }
-        })
-    })
+    .event_handler(Handler)
     .await?;
     client.start().await?;
     let web_port: u16 = std::env::var("WEB_PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(8080);

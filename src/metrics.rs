@@ -1,131 +1,453 @@
-use prometheus::{Encoder, TextEncoder, IntCounterVec, IntGauge, HistogramVec, register_int_counter_vec, register_histogram_vec, register_int_gauge, gather};
+use prometheus::{IntCounterVec, IntGauge, HistogramVec, register_int_counter_vec, register_histogram_vec, register_int_gauge};
 use lazy_static::lazy_static;
+
+/// Macro to register a gauge metric
+macro_rules! register_gauge {
+    ($name:ident, $help:expr) => {
+        pub static ref $name: IntGauge = register_int_gauge!(
+            concat!("bot_", stringify!($name)),
+            $help
+        ).unwrap();
+    };
+}
+
+/// Macro to register a counter vector metric
+macro_rules! register_counter_vec {
+    ($name:ident, $help:expr, $labels:expr) => {
+        pub static ref $name: IntCounterVec = register_int_counter_vec!(
+            concat!("bot_", stringify!($name)),
+            $help,
+            $labels
+        ).unwrap();
+    };
+}
+
+/// Macro to register a histogram vector metric
+macro_rules! register_histogram_vec {
+    ($name:ident, $help:expr, $labels:expr) => {
+        pub static ref $name: HistogramVec = register_histogram_vec!(
+            concat!("bot_", stringify!($name)),
+            $help,
+            $labels
+        ).unwrap();
+    };
+}
 
 // Global metrics registry
 lazy_static! {
-    pub static ref COMMAND_COUNTER: IntCounterVec = register_int_counter_vec!(
-        "bot_command_total",
-        "Total number of commands invoked",
-        &["command"]
-    ).unwrap();
-    pub static ref COMMAND_FAILURES: IntCounterVec = register_int_counter_vec!(
-        "bot_command_failures_total",
-        "Total number of failed command invocations",
-        &["command"]
-    ).unwrap();
-    pub static ref COMMAND_DURATION: HistogramVec = register_histogram_vec!(
-        "bot_command_duration_seconds",
-        "Command execution duration in seconds",
-        &["command"]
-    ).unwrap();
-    pub static ref HTTP_REQUESTS: IntCounterVec = register_int_counter_vec!(
-        "bot_http_requests_total",
-        "Total HTTP requests",
-        &["endpoint", "method"]
-    ).unwrap();
-    pub static ref HTTP_DURATION: HistogramVec = register_histogram_vec!(
-        "bot_http_request_duration_seconds",
-        "HTTP request duration in seconds",
-        &["endpoint", "method"]
-    ).unwrap();
-    pub static ref PROCESS_START_TIME: IntGauge = register_int_gauge!(
-        "process_start_time_seconds",
-        "Process start time in seconds since epoch"
-    ).unwrap();
-    pub static ref DB_POOL_CONNECTIONS: IntGauge = register_int_gauge!(
-        "bot_db_pool_connections",
-        "Number of DB pool connections"
-    ).unwrap();
-    pub static ref MEMORY_USAGE: IntGauge = register_int_gauge!(
-        "bot_memory_usage_bytes",
-        "Memory usage of the bot process in bytes"
-    ).unwrap();
-    pub static ref CPU_USAGE: IntGauge = register_int_gauge!(
-        "bot_cpu_usage_percent",
-        "CPU usage of the bot process in percent (0-100)"
-    ).unwrap();
-    pub static ref DISCORD_GUILD_COUNT: IntGauge = register_int_gauge!(
-        "bot_discord_guild_count",
-        "Number of Discord guilds (servers) the bot is in"
-    ).unwrap();
-    pub static ref DISCORD_USER_COUNT: IntGauge = register_int_gauge!(
-        "bot_discord_user_count",
-        "Number of Discord users visible to the bot"
-    ).unwrap();
-    pub static ref DISCORD_CHANNEL_COUNT: IntGauge = register_int_gauge!(
-        "bot_discord_channel_count",
-        "Number of Discord channels visible to the bot"
-    ).unwrap();
-    pub static ref GUILD_MEMBER_COUNT: IntGauge = register_int_gauge!(
-        "bot_guild_member_count",
-        "Number of members in each guild"
-    ).unwrap();
-    pub static ref GUILD_CHANNEL_COUNT: IntGauge = register_int_gauge!(
-        "bot_guild_channel_count",
-        "Number of channels in each guild"
-    ).unwrap();
-    pub static ref GUILD_ROLE_COUNT: IntGauge = register_int_gauge!(
-        "bot_guild_role_count",
-        "Number of roles in each guild"
-    ).unwrap();
-    pub static ref GUILD_ONLINE_COUNT: IntGauge = register_int_gauge!(
-        "bot_guild_online_count",
-        "Number of online members in each guild"
-    ).unwrap();
-    pub static ref GUILD_CREATION_TIME: IntGauge = register_int_gauge!(
-        "bot_guild_creation_time_seconds",
-        "Guild creation time in seconds since epoch"
-    ).unwrap();
-    pub static ref GUILD_HUMAN_COUNT: IntGauge = register_int_gauge!(
-        "bot_guild_human_count",
-        "Number of human members in each guild"
-    ).unwrap();
-    pub static ref GUILD_BOT_COUNT: IntGauge = register_int_gauge!(
-        "bot_guild_bot_count",
-        "Number of bot members in each guild"
-    ).unwrap();
-    pub static ref GUILD_TEXT_CHANNEL_COUNT: IntGauge = register_int_gauge!(
-        "bot_guild_text_channel_count",
-        "Number of text channels in each guild"
-    ).unwrap();
-    pub static ref GUILD_VOICE_CHANNEL_COUNT: IntGauge = register_int_gauge!(
-        "bot_guild_voice_channel_count",
-        "Number of voice channels in each guild"
-    ).unwrap();
-    pub static ref GUILD_CATEGORY_CHANNEL_COUNT: IntGauge = register_int_gauge!(
-        "bot_guild_category_channel_count",
-        "Number of category channels in each guild"
-    ).unwrap();
-    pub static ref GUILD_EMOJI_COUNT: IntGauge = register_int_gauge!(
-        "bot_guild_emoji_count",
-        "Number of emojis in each guild"
-    ).unwrap();
-    pub static ref GUILD_STICKER_COUNT: IntGauge = register_int_gauge!(
-        "bot_guild_sticker_count",
-        "Number of stickers in each guild"
-    ).unwrap();
-    pub static ref GUILD_BOOST_COUNT: IntGauge = register_int_gauge!(
-        "bot_guild_boost_count",
-        "Number of boosts in each guild"
-    ).unwrap();
-    pub static ref GUILD_PREMIUM_TIER: IntGauge = register_int_gauge!(
-        "bot_guild_premium_tier",
-        "Premium tier of each guild"
-    ).unwrap();
-    pub static ref GUILD_OWNER_ID: IntGauge = register_int_gauge!(
-        "bot_guild_owner_id",
-        "Owner ID of each guild (gauge set to 1 for the owner, 0 otherwise)"
-    ).unwrap();
-    pub static ref GUILD_AFK_TIMEOUT: IntGauge = register_int_gauge!(
-        "bot_guild_afk_timeout_seconds",
-        "AFK timeout in seconds for each guild"
-    ).unwrap();
+    // Command metrics
+    pub mod command {
+        use super::*;
+        register_counter_vec!(
+            COUNTER,
+            "Total number of commands invoked",
+            &["command"]
+        );
+        register_counter_vec!(
+            FAILURES,
+            "Total number of failed command invocations",
+            &["command"]
+        );
+        register_histogram_vec!(
+            DURATION,
+            "Command execution duration in seconds",
+            &["command"]
+        );
+    }
+
+    // HTTP metrics
+    pub mod http {
+        use super::*;
+        register_counter_vec!(
+            REQUESTS,
+            "Total HTTP requests",
+            &["endpoint", "method"]
+        );
+        register_histogram_vec!(
+            DURATION,
+            "HTTP request duration in seconds",
+            &["endpoint", "method"]
+        );
+    }
+
+    // Process metrics
+    pub mod process {
+        use super::*;
+        register_gauge!(
+            START_TIME,
+            "Process start time in seconds since epoch"
+        );
+        register_gauge!(
+            DB_POOL_CONNECTIONS,
+            "Number of DB pool connections"
+        );
+        register_gauge!(
+            MEMORY_USAGE,
+            "Memory usage of the bot process in bytes"
+        );
+        register_gauge!(
+            CPU_USAGE,
+            "CPU usage of the bot process in percent (0-100)"
+        );
+    }
+
+    // Discord metrics
+    pub mod discord {
+        use super::*;
+        register_gauge!(
+            GUILD_COUNT,
+            "Number of Discord guilds (servers) the bot is in"
+        );
+        register_gauge!(
+            USER_COUNT,
+            "Number of Discord users visible to the bot"
+        );
+        register_gauge!(
+            CHANNEL_COUNT,
+            "Number of Discord channels visible to the bot"
+        );
+    }
+
+    // Guild metrics
+    pub mod guild {
+        use super::*;
+        register_gauge!(
+            MEMBER_COUNT,
+            "Number of members in each guild"
+        );
+        register_gauge!(
+            CHANNEL_COUNT,
+            "Number of channels in each guild"
+        );
+        register_gauge!(
+            ROLE_COUNT,
+            "Number of roles in each guild"
+        );
+        register_gauge!(
+            ONLINE_COUNT,
+            "Number of online members in each guild"
+        );
+        register_gauge!(
+            CREATION_TIME,
+            "Guild creation time in seconds since epoch"
+        );
+        register_gauge!(
+            HUMAN_COUNT,
+            "Number of human members in each guild"
+        );
+        register_gauge!(
+            BOT_COUNT,
+            "Number of bot members in each guild"
+        );
+        register_gauge!(
+            TEXT_CHANNEL_COUNT,
+            "Number of text channels in each guild"
+        );
+        register_gauge!(
+            VOICE_CHANNEL_COUNT,
+            "Number of voice channels in each guild"
+        );
+        register_gauge!(
+            CATEGORY_CHANNEL_COUNT,
+            "Number of category channels in each guild"
+        );
+        register_gauge!(
+            EMOJI_COUNT,
+            "Number of emojis in each guild"
+        );
+        register_gauge!(
+            STICKER_COUNT,
+            "Number of stickers in each guild"
+        );
+        register_gauge!(
+            BOOST_COUNT,
+            "Number of boosts in each guild"
+        );
+        register_gauge!(
+            PREMIUM_TIER,
+            "Premium tier of each guild"
+        );
+        register_gauge!(
+            OWNER_ID,
+            "Owner ID of each guild (gauge set to 1 for the owner, 0 otherwise)"
+        );
+        register_gauge!(
+            AFK_TIMEOUT,
+            "AFK timeout in seconds for each guild"
+        );
+    }
+
+    // Interaction metrics
+    pub mod interaction {
+        use super::*;
+        // Slash command metrics
+        register_counter_vec!(
+            SLASH_COMMAND_USAGE,
+            "Total number of slash commands used",
+            &["command", "guild_id"]
+        );
+        register_histogram_vec!(
+            SLASH_COMMAND_DURATION,
+            "Time taken to process slash commands",
+            &["command", "guild_id"]
+        );
+        register_counter_vec!(
+            SLASH_COMMAND_FAILURES,
+            "Number of failed slash command executions",
+            &["command", "guild_id", "error_type"]
+        );
+
+        // Button interaction metrics
+        register_counter_vec!(
+            BUTTON_CLICKS,
+            "Total number of button clicks",
+            &["button_id", "guild_id"]
+        );
+        register_histogram_vec!(
+            BUTTON_RESPONSE_TIME,
+            "Time taken to respond to button clicks",
+            &["button_id", "guild_id"]
+        );
+        register_counter_vec!(
+            BUTTON_FAILURES,
+            "Number of failed button interactions",
+            &["button_id", "guild_id", "error_type"]
+        );
+
+        // Select menu metrics
+        register_counter_vec!(
+            SELECT_MENU_USAGE,
+            "Total number of select menu interactions",
+            &["menu_id", "guild_id"]
+        );
+        register_histogram_vec!(
+            SELECT_MENU_RESPONSE_TIME,
+            "Time taken to respond to select menu interactions",
+            &["menu_id", "guild_id"]
+        );
+        register_counter_vec!(
+            SELECT_MENU_FAILURES,
+            "Number of failed select menu interactions",
+            &["menu_id", "guild_id", "error_type"]
+        );
+
+        // Modal submission metrics
+        register_counter_vec!(
+            MODAL_SUBMISSIONS,
+            "Total number of modal form submissions",
+            &["modal_id", "guild_id"]
+        );
+        register_histogram_vec!(
+            MODAL_PROCESSING_TIME,
+            "Time taken to process modal submissions",
+            &["modal_id", "guild_id"]
+        );
+        register_counter_vec!(
+            MODAL_FAILURES,
+            "Number of failed modal submissions",
+            &["modal_id", "guild_id", "error_type"]
+        );
+
+        // Context menu metrics
+        register_counter_vec!(
+            CONTEXT_MENU_USAGE,
+            "Total number of context menu interactions",
+            &["command", "guild_id"]
+        );
+        register_histogram_vec!(
+            CONTEXT_MENU_DURATION,
+            "Time taken to process context menu commands",
+            &["command", "guild_id"]
+        );
+        register_counter_vec!(
+            CONTEXT_MENU_FAILURES,
+            "Number of failed context menu interactions",
+            &["command", "guild_id", "error_type"]
+        );
+
+        // Autocomplete metrics
+        register_counter_vec!(
+            AUTOCOMPLETE_REQUESTS,
+            "Total number of autocomplete requests",
+            &["command", "guild_id"]
+        );
+        register_histogram_vec!(
+            AUTOCOMPLETE_RESPONSE_TIME,
+            "Time taken to respond to autocomplete requests",
+            &["command", "guild_id"]
+        );
+        register_counter_vec!(
+            AUTOCOMPLETE_FAILURES,
+            "Number of failed autocomplete requests",
+            &["command", "guild_id", "error_type"]
+        );
+
+        // Interaction rate limiting metrics
+        register_counter_vec!(
+            RATE_LIMIT_HITS,
+            "Number of times rate limits were hit",
+            &["interaction_type", "guild_id"]
+        );
+        register_gauge!(
+            ACTIVE_INTERACTIONS,
+            "Number of currently active interactions"
+        );
+    }
 }
 
-pub fn prometheus_metrics() -> String {
-    let encoder = TextEncoder::new();
-    let metric_families = gather();
-    let mut buffer = Vec::new();
-    encoder.encode(&metric_families, &mut buffer).unwrap();
-    String::from_utf8(buffer).unwrap()
+// Re-export commonly used metrics
+pub use command::{COUNTER as COMMAND_COUNTER, FAILURES as COMMAND_FAILURES, DURATION as COMMAND_DURATION};
+pub use http::{REQUESTS as HTTP_REQUESTS, DURATION as HTTP_DURATION};
+pub use process::{START_TIME as PROCESS_START_TIME, DB_POOL_CONNECTIONS, MEMORY_USAGE, CPU_USAGE};
+pub use discord::{GUILD_COUNT, USER_COUNT, CHANNEL_COUNT};
+pub use guild::{
+    MEMBER_COUNT, CHANNEL_COUNT as GUILD_CHANNEL_COUNT, ROLE_COUNT, ONLINE_COUNT,
+    CREATION_TIME, HUMAN_COUNT, BOT_COUNT, TEXT_CHANNEL_COUNT, VOICE_CHANNEL_COUNT,
+    CATEGORY_CHANNEL_COUNT, EMOJI_COUNT, STICKER_COUNT, BOOST_COUNT,
+    PREMIUM_TIER, OWNER_ID, AFK_TIMEOUT
+};
+pub use interaction::{
+    SLASH_COMMAND_USAGE, SLASH_COMMAND_DURATION, SLASH_COMMAND_FAILURES,
+    BUTTON_CLICKS, BUTTON_RESPONSE_TIME, BUTTON_FAILURES,
+    SELECT_MENU_USAGE, SELECT_MENU_RESPONSE_TIME, SELECT_MENU_FAILURES,
+    MODAL_SUBMISSIONS, MODAL_PROCESSING_TIME, MODAL_FAILURES,
+    CONTEXT_MENU_USAGE, CONTEXT_MENU_DURATION, CONTEXT_MENU_FAILURES,
+    AUTOCOMPLETE_REQUESTS, AUTOCOMPLETE_RESPONSE_TIME, AUTOCOMPLETE_FAILURES,
+    RATE_LIMIT_HITS, ACTIVE_INTERACTIONS
+};
+
+pub fn record_http_request(endpoint: &str, method: &str) {
+    HTTP_REQUESTS.with_label_values(&[endpoint, method]).inc();
+}
+
+pub fn record_command_execution(command: &str) {
+    COMMAND_COUNTER.with_label_values(&[command]).inc();
+}
+
+pub fn record_command_duration(command: &str, duration: f64) {
+    COMMAND_DURATION.with_label_values(&[command]).observe(duration);
+}
+
+pub fn update_guild_count(count: i64) {
+    GUILD_COUNT.set(count);
+}
+
+pub fn update_member_count(count: i64) {
+    MEMBER_COUNT.set(count);
+}
+
+// Helper functions for interaction metrics
+pub fn record_slash_command(command: &str, guild_id: &str, duration: f64) {
+    SLASH_COMMAND_USAGE.with_label_values(&[command, guild_id]).inc();
+    SLASH_COMMAND_DURATION.with_label_values(&[command, guild_id]).observe(duration);
+}
+
+pub fn record_slash_command_failure(command: &str, guild_id: &str, error_type: &str) {
+    SLASH_COMMAND_FAILURES.with_label_values(&[command, guild_id, error_type]).inc();
+}
+
+pub fn record_button_click(button_id: &str, guild_id: &str, response_time: f64) {
+    BUTTON_CLICKS.with_label_values(&[button_id, guild_id]).inc();
+    BUTTON_RESPONSE_TIME.with_label_values(&[button_id, guild_id]).observe(response_time);
+}
+
+pub fn record_button_failure(button_id: &str, guild_id: &str, error_type: &str) {
+    BUTTON_FAILURES.with_label_values(&[button_id, guild_id, error_type]).inc();
+}
+
+pub fn record_select_menu_usage(menu_id: &str, guild_id: &str, response_time: f64) {
+    SELECT_MENU_USAGE.with_label_values(&[menu_id, guild_id]).inc();
+    SELECT_MENU_RESPONSE_TIME.with_label_values(&[menu_id, guild_id]).observe(response_time);
+}
+
+pub fn record_select_menu_failure(menu_id: &str, guild_id: &str, error_type: &str) {
+    SELECT_MENU_FAILURES.with_label_values(&[menu_id, guild_id, error_type]).inc();
+}
+
+pub fn record_modal_submission(modal_id: &str, guild_id: &str, processing_time: f64) {
+    MODAL_SUBMISSIONS.with_label_values(&[modal_id, guild_id]).inc();
+    MODAL_PROCESSING_TIME.with_label_values(&[modal_id, guild_id]).observe(processing_time);
+}
+
+pub fn record_modal_failure(modal_id: &str, guild_id: &str, error_type: &str) {
+    MODAL_FAILURES.with_label_values(&[modal_id, guild_id, error_type]).inc();
+}
+
+pub fn record_context_menu_usage(command: &str, guild_id: &str, duration: f64) {
+    CONTEXT_MENU_USAGE.with_label_values(&[command, guild_id]).inc();
+    CONTEXT_MENU_DURATION.with_label_values(&[command, guild_id]).observe(duration);
+}
+
+pub fn record_context_menu_failure(command: &str, guild_id: &str, error_type: &str) {
+    CONTEXT_MENU_FAILURES.with_label_values(&[command, guild_id, error_type]).inc();
+}
+
+pub fn record_autocomplete_request(command: &str, guild_id: &str, response_time: f64) {
+    AUTOCOMPLETE_REQUESTS.with_label_values(&[command, guild_id]).inc();
+    AUTOCOMPLETE_RESPONSE_TIME.with_label_values(&[command, guild_id]).observe(response_time);
+}
+
+pub fn record_autocomplete_failure(command: &str, guild_id: &str, error_type: &str) {
+    AUTOCOMPLETE_FAILURES.with_label_values(&[command, guild_id, error_type]).inc();
+}
+
+pub fn record_rate_limit_hit(interaction_type: &str, guild_id: &str) {
+    RATE_LIMIT_HITS.with_label_values(&[interaction_type, guild_id]).inc();
+}
+
+pub fn update_active_interactions(count: i64) {
+    ACTIVE_INTERACTIONS.set(count);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_metrics() {
+        // Test HTTP request recording
+        record_http_request("/test", "GET");
+        assert_eq!(HTTP_REQUESTS.with_label_values(&["/test", "GET"]).get(), 1);
+
+        // Test command execution recording
+        record_command_execution("test_command");
+        assert_eq!(COMMAND_COUNTER.with_label_values(&["test_command"]).get(), 1);
+
+        // Test command duration recording
+        record_command_duration("test_command", 1.5);
+        let duration = COMMAND_DURATION.with_label_values(&["test_command"]).get_sample_sum();
+        assert!(duration > 0.0);
+
+        // Test guild and member count updates
+        update_guild_count(5);
+        assert_eq!(GUILD_COUNT.get(), 5);
+
+        update_member_count(100);
+        assert_eq!(MEMBER_COUNT.get(), 100);
+
+        // Test interaction metrics
+        record_slash_command("test_command", "123", 0.5);
+        assert_eq!(SLASH_COMMAND_USAGE.with_label_values(&["test_command", "123"]).get(), 1);
+
+        record_button_click("test_button", "123", 0.2);
+        assert_eq!(BUTTON_CLICKS.with_label_values(&["test_button", "123"]).get(), 1);
+
+        record_select_menu_usage("test_menu", "123", 0.3);
+        assert_eq!(SELECT_MENU_USAGE.with_label_values(&["test_menu", "123"]).get(), 1);
+
+        record_modal_submission("test_modal", "123", 0.4);
+        assert_eq!(MODAL_SUBMISSIONS.with_label_values(&["test_modal", "123"]).get(), 1);
+
+        record_context_menu_usage("test_context", "123", 0.6);
+        assert_eq!(CONTEXT_MENU_USAGE.with_label_values(&["test_context", "123"]).get(), 1);
+
+        record_autocomplete_request("test_command", "123", 0.1);
+        assert_eq!(AUTOCOMPLETE_REQUESTS.with_label_values(&["test_command", "123"]).get(), 1);
+
+        record_rate_limit_hit("slash_command", "123");
+        assert_eq!(RATE_LIMIT_HITS.with_label_values(&["slash_command", "123"]).get(), 1);
+
+        update_active_interactions(5);
+        assert_eq!(ACTIVE_INTERACTIONS.get(), 5);
+    }
 }
