@@ -2,55 +2,76 @@ pub mod commands;
 pub mod db;
 pub mod interactions;
 pub mod metrics;
+pub mod models;
 pub mod schema;
 pub mod utils;
 
-pub use crate::db::Pool;
+pub use db::Pool;
+pub use interactions::InteractionTracker;
+
 pub use crate::metrics::{
-    command::{
-        COUNTER as COMMAND_COUNTER, DURATION as COMMAND_DURATION, FAILURES as COMMAND_FAILURES,
-    },
-    discord::{CHANNEL_COUNT, GUILD_COUNT, USER_COUNT},
-    guild::{
-        AFK_TIMEOUT, BOOST_COUNT, BOT_COUNT, CATEGORY_CHANNEL_COUNT,
-        CHANNEL_COUNT as GUILD_CHANNEL_COUNT, CREATION_TIME, EMOJI_COUNT, HUMAN_COUNT,
-        MEMBER_COUNT, ONLINE_COUNT, OWNER_ID, PREMIUM_TIER, ROLE_COUNT, STICKER_COUNT,
-        TEXT_CHANNEL_COUNT, VOICE_CHANNEL_COUNT,
-    },
-    http::{DURATION as HTTP_DURATION, REQUESTS as HTTP_REQUESTS},
-    interaction::{
-        AUTOCOMPLETE_REQUESTS, BUTTON_CLICKS, CONTEXT_MENU_USAGE, MODAL_SUBMISSIONS,
-        SELECT_MENU_USAGE, SLASH_COMMAND_USAGE,
-    },
-    process::{CPU_USAGE, DB_POOL_CONNECTIONS, MEMORY_USAGE, START_TIME as PROCESS_START_TIME},
+    COMMAND_REQUESTS,
+    COMMAND_ERRORS,
+    COMMAND_DURATION,
+    HTTP_REQUESTS,
+    HTTP_DURATION,
+    CPU_USAGE,
+    MEMORY_USAGE,
+    DB_POOL_CONNECTIONS,
+    PROCESS_START_TIME,
+    GUILD_COUNT,
+    USER_COUNT,
+    CHANNEL_COUNT,
+    MEMBER_COUNT,
+    TEXT_CHANNEL_COUNT,
+    VOICE_CHANNEL_COUNT,
+    CATEGORY_COUNT,
+    ROLE_COUNT,
+    EMOJI_COUNT,
+    BOOST_COUNT,
+    BOOST_LEVEL,
+    INTERACTION_REQUESTS,
+    INTERACTION_ERRORS,
+    INTERACTION_DURATION,
 };
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
+pub type Context<'a> = poise::Context<'a, Data, Error>;
 
-use crate::interactions::InteractionTracker;
 use serenity::model::id::{ChannelId, GuildId, UserId};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::PgConnection;
+use std::time::Instant;
+use poise::serenity_prelude::{
+    Channel, Guild, User,
+    model::channel::Channel as SerenityChannel,
+    model::guild::Guild as SerenityGuild,
+    model::user::User as SerenityUser,
+};
+
+pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 
 pub struct Data {
-    pub db_pool: Arc<db::Pool>,
-    pub command_timers: Arc<RwLock<HashMap<String, u64>>>,
-    pub guilds: Arc<RwLock<HashMap<GuildId, u64>>>,
-    pub users: Arc<RwLock<HashMap<UserId, u64>>>,
-    pub channels: Arc<RwLock<HashMap<ChannelId, u64>>>,
-    pub interaction_tracker: Arc<InteractionTracker>,
+    pub db_pool: Arc<DbPool>,
+    pub command_timers: HashMap<String, Instant>,
+    pub guilds: Arc<HashMap<GuildId, SerenityGuild>>,
+    pub users: Arc<HashMap<UserId, SerenityUser>>,
+    pub channels: Arc<HashMap<GuildId, Vec<SerenityChannel>>>,
+    pub interaction_tracker: RwLock<InteractionTracker>,
 }
 
 impl Data {
-    pub fn new(db_pool: db::Pool) -> Self {
+    pub fn new(db_pool: DbPool) -> Self {
         Self {
-            db_pool: Arc::new(db_pool.clone()),
-            command_timers: Arc::new(RwLock::new(HashMap::new())),
-            guilds: Arc::new(RwLock::new(HashMap::new())),
-            users: Arc::new(RwLock::new(HashMap::new())),
-            channels: Arc::new(RwLock::new(HashMap::new())),
-            interaction_tracker: Arc::new(InteractionTracker::new(db_pool)),
+            db_pool: Arc::new(db_pool),
+            command_timers: HashMap::new(),
+            guilds: Arc::new(HashMap::new()),
+            users: Arc::new(HashMap::new()),
+            channels: Arc::new(HashMap::new()),
+            interaction_tracker: RwLock::new(InteractionTracker::new()),
         }
     }
 }

@@ -1,33 +1,20 @@
-use crate::schema::descriptions;
 use crate::schema::{
-    command_logs, command_stats, interaction_logs, interaction_stats, rate_limits,
+    command_history, command_logs, command_stats, descriptions, interaction_logs, interaction_stats, rate_limits,
 };
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use diesel::{AsChangeset, Insertable, Queryable};
 use serde::{Deserialize, Serialize};
 
-#[derive(Queryable, AsChangeset)]
-pub struct Description {
-    pub key: String,
-    pub value: String,
-}
-
-#[derive(Insertable, AsChangeset)]
-#[diesel(table_name = descriptions)]
-pub struct NewDescription<'a> {
-    pub key: &'a str,
-    pub value: &'a str,
-}
-
-#[derive(Debug, Queryable, Selectable, Serialize)]
+#[derive(Debug, Queryable, Selectable)]
 #[diesel(table_name = crate::schema::command_history)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct CommandHistory {
-    pub id: i64,
+    pub id: i32,
     pub command: String,
-    pub arguments: String,
+    pub arguments: Option<String>,
     pub user_id: i64,
+    pub guild_id: Option<i64>,
     pub executed_at: NaiveDateTime,
 }
 
@@ -35,39 +22,35 @@ pub struct CommandHistory {
 #[diesel(table_name = crate::schema::command_history)]
 pub struct NewCommandHistory {
     pub command: String,
-    pub arguments: String,
+    pub arguments: Option<String>,
     pub user_id: i64,
+    pub guild_id: Option<i64>,
     pub executed_at: NaiveDateTime,
 }
 
-#[derive(Debug, Queryable, Selectable, Serialize)]
+#[derive(Debug, Queryable, Selectable)]
 #[diesel(table_name = crate::schema::command_stats)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct CommandStats {
-    pub id: i64,
+pub struct CommandStat {
+    pub id: i32,
     pub command: String,
-    pub arguments: String,
-    pub count: i64,
+    pub arguments: Option<String>,
+    pub count: i32,
     pub last_used: NaiveDateTime,
 }
 
 #[derive(Debug, Insertable)]
 #[diesel(table_name = crate::schema::command_stats)]
-pub struct NewCommandStats {
+pub struct NewCommandStat {
     pub command: String,
-    pub arguments: String,
-    pub count: i64,
+    pub arguments: Option<String>,
+    pub count: i32,
     pub last_used: NaiveDateTime,
 }
 
-#[derive(Debug, AsChangeset)]
-#[diesel(table_name = crate::schema::command_stats)]
-pub struct UpdateCommandStats {
-    pub count: i64,
-    pub last_used: NaiveDateTime,
-}
-
-#[derive(Queryable, Debug)]
+#[derive(Debug, Queryable, Selectable, Serialize)]
+#[diesel(table_name = command_logs)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct CommandLog {
     pub id: i32,
     pub user_id: i64,
@@ -75,7 +58,7 @@ pub struct CommandLog {
     pub executed_at: i64,
 }
 
-#[derive(Insertable)]
+#[derive(Debug, Insertable)]
 #[diesel(table_name = command_logs)]
 pub struct NewCommandLog {
     pub user_id: i64,
@@ -83,19 +66,16 @@ pub struct NewCommandLog {
     pub executed_at: i64,
 }
 
-#[derive(Debug, Queryable, Selectable, Serialize)]
+#[derive(Debug, Queryable, Selectable)]
 #[diesel(table_name = crate::schema::interaction_logs)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct InteractionLog {
-    pub id: i64,
+    pub id: i32,
     pub interaction_type: String,
     pub interaction_id: String,
     pub guild_id: i64,
     pub user_id: i64,
-    pub executed_at: NaiveDateTime,
-    pub duration: f64,
-    pub success: bool,
-    pub error_type: Option<String>,
+    pub timestamp: NaiveDateTime,
 }
 
 #[derive(Debug, Insertable)]
@@ -105,23 +85,16 @@ pub struct NewInteractionLog {
     pub interaction_id: String,
     pub guild_id: i64,
     pub user_id: i64,
-    pub executed_at: NaiveDateTime,
-    pub duration: f64,
-    pub success: bool,
-    pub error_type: Option<String>,
+    pub timestamp: NaiveDateTime,
 }
 
-#[derive(Debug, Queryable, Selectable, Serialize)]
+#[derive(Debug, Queryable, Selectable)]
 #[diesel(table_name = crate::schema::interaction_stats)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct InteractionStats {
-    pub id: i64,
+    pub id: i32,
     pub interaction_type: String,
-    pub interaction_id: String,
-    pub guild_id: i64,
-    pub count: i64,
-    pub total_duration: f64,
-    pub failure_count: i64,
+    pub count: i32,
     pub last_used: NaiveDateTime,
 }
 
@@ -129,166 +102,151 @@ pub struct InteractionStats {
 #[diesel(table_name = crate::schema::interaction_stats)]
 pub struct NewInteractionStats {
     pub interaction_type: String,
-    pub interaction_id: String,
-    pub guild_id: i64,
-    pub count: i64,
-    pub total_duration: f64,
-    pub failure_count: i64,
+    pub count: i32,
     pub last_used: NaiveDateTime,
 }
 
 #[derive(Debug, AsChangeset)]
 #[diesel(table_name = crate::schema::interaction_stats)]
 pub struct UpdateInteractionStats {
-    pub count: i64,
-    pub total_duration: f64,
-    pub failure_count: i64,
+    pub count: i32,
     pub last_used: NaiveDateTime,
 }
 
-#[derive(Debug, Queryable, Selectable, Serialize)]
+#[derive(Debug, Queryable, Selectable)]
 #[diesel(table_name = crate::schema::rate_limits)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct RateLimit {
-    pub id: i64,
-    pub interaction_type: String,
-    pub guild_id: i64,
-    pub hits: i64,
-    pub reset_at: NaiveDateTime,
+    pub id: i32,
+    pub user_id: i64,
+    pub command: String,
+    pub last_used: NaiveDateTime,
+    pub count: i32,
 }
 
 #[derive(Debug, Insertable)]
 #[diesel(table_name = crate::schema::rate_limits)]
 pub struct NewRateLimit {
-    pub interaction_type: String,
-    pub guild_id: i64,
-    pub hits: i64,
-    pub reset_at: NaiveDateTime,
+    pub user_id: i64,
+    pub command: String,
+    pub last_used: NaiveDateTime,
+    pub count: i32,
 }
 
 #[derive(Debug, AsChangeset)]
 #[diesel(table_name = crate::schema::rate_limits)]
 pub struct UpdateRateLimit {
-    pub hits: i64,
-    pub reset_at: NaiveDateTime,
+    pub last_used: NaiveDateTime,
+    pub count: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
+#[diesel(table_name = crate::schema::descriptions)]
+pub struct Description {
+    pub id: i64,
+    pub key: String,
+    pub value: String,
+    pub guild_id: i64,
+    pub user_id: i64,
+    pub timestamp: NaiveDateTime,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Utc;
+
+    #[test]
+    fn test_command_history_struct() {
+        let now = Utc::now().naive_utc();
+        let history = CommandHistory {
+            id: 1,
+            command: "test".to_string(),
+            arguments: Some("arg1 arg2".to_string()),
+            user_id: 123,
+            guild_id: Some(456),
+            executed_at: now,
+        };
+        assert_eq!(history.command, "test");
+        assert_eq!(history.arguments, Some("arg1 arg2".to_string()));
+        assert_eq!(history.user_id, 123);
+        assert_eq!(history.guild_id, Some(456));
+    }
+
+    #[test]
+    fn test_command_stat_struct() {
+        let now = Utc::now().naive_utc();
+        let stat = CommandStat {
+            id: 1,
+            command: "test".to_string(),
+            arguments: Some("arg1 arg2".to_string()),
+            count: 5,
+            last_used: now,
+        };
+        assert_eq!(stat.command, "test");
+        assert_eq!(stat.arguments, Some("arg1 arg2".to_string()));
+        assert_eq!(stat.count, 5);
+    }
 
     #[test]
     fn test_description_struct() {
+        let now = Utc::now().naive_utc();
         let desc = Description {
-            key: "foo".to_string(),
-            value: "bar".to_string(),
-        };
-        assert_eq!(desc.key, "foo");
-        assert_eq!(desc.value, "bar");
-    }
-
-    #[test]
-    fn test_new_description_struct() {
-        let new_desc = NewDescription {
-            key: "foo",
-            value: "bar",
-        };
-        assert_eq!(new_desc.key, "foo");
-        assert_eq!(new_desc.value, "bar");
-    }
-
-    #[test]
-    fn test_command_log() {
-        let log = CommandLog {
             id: 1,
-            user_id: 123,
-            command_name: "test".to_string(),
-            executed_at: 1234567890,
-        };
-        assert_eq!(log.id, 1);
-        assert_eq!(log.user_id, 123);
-        assert_eq!(log.command_name, "test");
-        assert_eq!(log.executed_at, 1234567890);
-    }
-
-    #[test]
-    fn test_command_stats() {
-        let now = chrono::Utc::now().naive_utc();
-        let stats = CommandStats {
-            id: 1,
-            command: "test".to_string(),
-            arguments: "arg1 arg2".to_string(),
-            count: 42,
-            last_used: now,
-        };
-        assert_eq!(stats.id, 1);
-        assert_eq!(stats.command, "test");
-        assert_eq!(stats.arguments, "arg1 arg2");
-        assert_eq!(stats.count, 42);
-        assert_eq!(stats.last_used, now);
-    }
-
-    #[test]
-    fn test_interaction_log() {
-        let now = chrono::Utc::now().naive_utc();
-        let log = InteractionLog {
-            id: 1,
-            interaction_type: "slash_command".to_string(),
-            interaction_id: "test_command".to_string(),
+            key: "test_key".to_string(),
+            value: "test_value".to_string(),
             guild_id: 123,
             user_id: 456,
-            executed_at: now,
-            duration: 0.5,
-            success: true,
-            error_type: None,
+            timestamp: now,
         };
-        assert_eq!(log.id, 1);
-        assert_eq!(log.interaction_type, "slash_command");
-        assert_eq!(log.interaction_id, "test_command");
+        assert_eq!(desc.key, "test_key");
+        assert_eq!(desc.value, "test_value");
+        assert_eq!(desc.guild_id, 123);
+        assert_eq!(desc.user_id, 456);
+    }
+
+    #[test]
+    fn test_interaction_log_struct() {
+        let now = Utc::now().naive_utc();
+        let log = InteractionLog {
+            id: 1,
+            interaction_type: "test_type".to_string(),
+            interaction_id: "test_id".to_string(),
+            guild_id: 123,
+            user_id: 456,
+            timestamp: now,
+        };
+        assert_eq!(log.interaction_type, "test_type");
+        assert_eq!(log.interaction_id, "test_id");
         assert_eq!(log.guild_id, 123);
         assert_eq!(log.user_id, 456);
-        assert_eq!(log.duration, 0.5);
-        assert!(log.success);
-        assert!(log.error_type.is_none());
     }
 
     #[test]
-    fn test_interaction_stats() {
-        let now = chrono::Utc::now().naive_utc();
-        let stats = InteractionStats {
+    fn test_interaction_stat_struct() {
+        let now = Utc::now().naive_utc();
+        let stat = InteractionStats {
             id: 1,
-            interaction_type: "slash_command".to_string(),
-            interaction_id: "test_command".to_string(),
-            guild_id: 123,
-            count: 42,
-            total_duration: 21.0,
-            failure_count: 2,
+            interaction_type: "test_type".to_string(),
+            count: 5,
             last_used: now,
         };
-        assert_eq!(stats.id, 1);
-        assert_eq!(stats.interaction_type, "slash_command");
-        assert_eq!(stats.interaction_id, "test_command");
-        assert_eq!(stats.guild_id, 123);
-        assert_eq!(stats.count, 42);
-        assert_eq!(stats.total_duration, 21.0);
-        assert_eq!(stats.failure_count, 2);
-        assert_eq!(stats.last_used, now);
+        assert_eq!(stat.interaction_type, "test_type");
+        assert_eq!(stat.count, 5);
     }
 
     #[test]
-    fn test_rate_limit() {
-        let now = chrono::Utc::now().naive_utc();
+    fn test_rate_limit_struct() {
+        let now = Utc::now().naive_utc();
         let limit = RateLimit {
             id: 1,
-            interaction_type: "slash_command".to_string(),
-            guild_id: 123,
-            hits: 5,
-            reset_at: now,
+            user_id: 123,
+            command: "test_command".to_string(),
+            last_used: now,
+            count: 5,
         };
-        assert_eq!(limit.id, 1);
-        assert_eq!(limit.interaction_type, "slash_command");
-        assert_eq!(limit.guild_id, 123);
-        assert_eq!(limit.hits, 5);
-        assert_eq!(limit.reset_at, now);
+        assert_eq!(limit.user_id, 123);
+        assert_eq!(limit.command, "test_command");
+        assert_eq!(limit.count, 5);
     }
 }

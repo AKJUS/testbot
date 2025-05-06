@@ -9,7 +9,7 @@ use std::error::Error;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
-use sysinfo::{Process, ProcessExt, System, SystemExt};
+use sysinfo::{Process, System, SystemExt};
 use tokio::sync::RwLock;
 
 /// Error type for system operations
@@ -46,28 +46,27 @@ pub fn get_db_pool_connections(data: &Data) -> Result<i64, SystemError> {
 }
 
 /// Get the current memory usage in bytes
-pub fn get_memory_usage() -> Result<i64, Box<dyn Error>> {
+pub fn get_memory_usage() -> u64 {
     let mut sys = System::new_all();
     sys.refresh_all();
-    Ok(sys.used_memory() as i64)
+    sys.used_memory()
 }
 
 /// Get the current CPU usage as a percentage
-pub fn get_cpu_usage() -> Result<i64, Box<dyn Error>> {
+pub fn get_cpu_usage() -> f64 {
     let mut sys = System::new_all();
     sys.refresh_all();
-    Ok(sys.global_cpu_usage() as i64)
+    sys.global_cpu_info().cpu_usage()
 }
 
 /// Get the process start time in seconds since UNIX epoch
-pub fn get_process_start_time() -> Result<i64, Box<dyn Error>> {
+pub fn get_process_start_time() -> i64 {
     let mut sys = System::new_all();
     sys.refresh_all();
-    let pid = std::process::id() as usize;
-    if let Some(process) = sys.process(sysinfo::Pid::from(pid)) {
-        Ok(process.start_time() as i64)
+    if let Some(process) = sys.process(sysinfo::Pid::from(std::process::id() as usize)) {
+        process.start_time() as i64
     } else {
-        Err("Process not found".into())
+        0
     }
 }
 
@@ -81,9 +80,9 @@ pub fn get_uptime() -> Result<i64, Box<dyn Error>> {
 /// Get all system metrics
 pub fn get_all_system_metrics() -> Result<(i64, i64, i64), Box<dyn Error>> {
     Ok((
-        get_memory_usage()?,
-        get_cpu_usage()?,
-        get_process_start_time()?,
+        get_memory_usage() as i64,
+        get_cpu_usage() as i64,
+        get_process_start_time(),
     ))
 }
 
@@ -127,21 +126,21 @@ mod tests {
     #[test]
     fn test_system_metrics() {
         // Test memory usage
-        let memory = get_memory_usage().unwrap();
+        let memory = get_memory_usage();
         assert!(memory > 0);
 
         // Test CPU usage
-        let cpu = get_cpu_usage().unwrap();
-        assert!(cpu >= 0 && cpu <= 100);
+        let cpu = get_cpu_usage();
+        assert!(cpu >= 0.0 && cpu <= 100.0);
 
         // Test process start time
-        let start_time = get_process_start_time().unwrap();
+        let start_time = get_process_start_time();
         assert!(start_time > 0);
 
         // Test getting all metrics at once
         let (mem, cpu, time) = get_all_system_metrics().unwrap();
         assert!(mem > 0);
-        assert!(cpu >= 0 && cpu <= 100);
+        assert!(cpu >= 0.0 && cpu <= 100.0);
         assert!(time > 0);
     }
 
@@ -169,19 +168,19 @@ mod tests {
 
     #[test]
     fn test_memory_usage() {
-        let memory = get_memory_usage().unwrap();
+        let memory = get_memory_usage();
         assert!(memory > 0);
     }
 
     #[test]
     fn test_cpu_usage() {
-        let cpu = get_cpu_usage().unwrap();
-        assert!(cpu >= 0 && cpu <= 100);
+        let cpu = get_cpu_usage();
+        assert!(cpu >= 0.0 && cpu <= 100.0);
     }
 
     #[test]
     fn test_process_start_time() {
-        let start_time = get_process_start_time().unwrap();
+        let start_time = get_process_start_time();
         assert!(start_time > 0);
     }
 

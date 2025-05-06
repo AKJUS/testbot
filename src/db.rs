@@ -9,6 +9,9 @@ use std::error::Error;
 pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 pub type DbConnection = PooledConnection<ConnectionManager<PgConnection>>;
 
+// Re-export Pool for use in other modules
+pub use diesel::r2d2::Pool;
+
 /// Establish a connection to the database
 pub fn establish_connection() -> DbPool {
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");

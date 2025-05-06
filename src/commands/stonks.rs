@@ -63,32 +63,52 @@ pub async fn graph(
 ) -> Result<(), crate::Error> {
     let api_key = env::var("ALPHAVANTAGE_API_KEY")
         .map_err(|_| "ALPHAVANTAGE_API_KEY not set in environment")?;
+    
     let url = format!(
         "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={}&apikey={}",
         ticker, api_key
     );
-    let resp = reqwest::get(&url).await?.json::<TimeSeriesDaily>().await?;
+    
+    let resp = reqwest::get(&url)
+        .await?
+        .json::<TimeSeriesDaily>()
+        .await
+        .map_err(|e| format!("Failed to fetch or parse stock data: {}", e))?;
+
+    if resp.time_series.is_empty() {
+        return Err("No data available for the specified ticker".into());
+    }
+
     let mut dates: Vec<_> = resp.time_series.iter().collect();
     dates.sort_by_key(|(date, _)| *date);
+    
     let closes: Vec<f64> = dates
         .iter()
         .map(|(_, data)| data.close.parse::<f64>().unwrap_or(0.0))
         .collect();
+
+    if closes.is_empty() {
+        return Err("No valid closing prices found".into());
+    }
+
     let date_labels: Vec<&str> = dates.iter().map(|(d, _)| d.as_str()).collect();
 
     // Plot to a buffer
-    let mut buf = vec![];
+    let mut buf = String::new();
     {
-        let root = BitMapBackend::with_buffer(&mut buf, (800, 480)).into_drawing_area();
+        let root = SVGBackend::with_string(&mut buf, (800, 480)).into_drawing_area();
         root.fill(&WHITE)?;
+        
         let min = closes.iter().cloned().fold(f64::INFINITY, f64::min);
         let max = closes.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        
         let mut chart = ChartBuilder::on(&root)
             .caption(format!("{} Closing Prices", ticker), ("monospace", 30))
             .margin(20)
             .x_label_area_size(40)
             .y_label_area_size(60)
             .build_cartesian_2d(0..closes.len(), min..max)?;
+
         chart
             .configure_mesh()
             .x_labels(10)
@@ -96,20 +116,24 @@ pub async fn graph(
             .y_desc("Close")
             .x_desc("Date")
             .draw()?;
+
         chart.draw_series(LineSeries::new(
             closes.iter().enumerate().map(|(i, v)| (i, *v)),
             &BLUE,
         ))?;
+
         root.present()?;
     }
+
     // Send as attachment
     ctx.send(
         poise::CreateReply::default().attachment(CreateAttachment::bytes(
-            buf,
-            format!("{}_graph.png", ticker),
+            buf.into_bytes(),
+            format!("{}_graph.svg", ticker),
         )),
     )
     .await?;
+    
     Ok(())
 }
 
@@ -141,8 +165,6 @@ mod tests {
     #[tokio::test]
     async fn test_graph_missing_api_key() {
         std::env::remove_var("ALPHAVANTAGE_API_KEY");
-        let _ctx = (); // Placeholder, can't test Discord context here
-        let _ticker = "AAPL".to_string();
         let result = std::env::var("ALPHAVANTAGE_API_KEY");
         assert!(result.is_err());
     }
